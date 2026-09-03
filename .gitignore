@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+build/
+.npm/
+
+# Local app data
+/data/sqlite/*.db
+/data/sqlite/*.sqlite3
+/data/uploads/*
+!/data/uploads/.gitkeep
+!/data/sqlite/.gitkeep
+
+# Editor/system
+.vscode/
+.DS_Store
+Thumbs.db
+coverage/
+.pytest_cache/
+.mypy_cache/

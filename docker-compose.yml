@@ -1,0 +1,32 @@
+version: '3.9'
+
+services:
+  backend:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    command: bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      DATABASE_URL: sqlite:///./data/sqlite/student_life_os.db
+      UPLOAD_DIR: ./data/uploads
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-changeme}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+    depends_on: []
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
