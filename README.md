@@ -60,6 +60,8 @@ This approach is ideal for:
 - Opportunity tracking and eligibility analysis
 - Skill-gap analysis for internship and job fit
 - DSA progress dashboard and revision suggestions
+- Job Agent with autonomous tailored SOP drafting and DSA readiness scoring
+- On-demand decision explainability via Featherless AI (`/explain`, `/why`)
 - Morning briefing workflow and daily review
 - Human approval for high-impact actions
 - Audit logging for autonomous operations
@@ -99,7 +101,8 @@ flowchart LR
     B --> C[SQLite Local DB]
     B --> D[Validated Tool Layer]
     D --> E[OpenClaw runtime]
-    E --> F[Gemini API]
+    E --> F[Gemini API - Extraction & Planning]
+    B --> H[Featherless AI - Decision Explanations]
     F --> G[Structured outputs]
     G --> B
 ```
@@ -112,7 +115,8 @@ flowchart LR
 - FastAPI for the API and validated tool layer
 - SQLite3 for local data persistence
 - OpenClaw for local agent orchestration
-- Gemini API for reasoning and extraction
+- Gemini API for extraction, analysis, and study planning
+- Featherless AI (Qwen 2.5 Instruct) for on-demand model decision explanations
 - Python for backend services and workflow orchestration
 - Python and npm for local stack startup
 
@@ -153,6 +157,16 @@ The backend always validates Gemini output before storing or acting on it.
 
 ---
 
+## Featherless AI Usage
+
+Featherless AI (powered by the `Qwen/Qwen2.5-1.5B-Instruct` model) provides **on-demand decision explanations**:
+
+- **Normal actions stay brief**: Standard agent actions, task creations, and schedule alerts show only a concise reason without triggering extra API calls.
+- **On-demand explanations**: When a student explicitly asks why a decision was made (via `/explain`, `/why`, or natural chat in Telegram/API), Featherless AI explains *what decision was made*, *why it was made*, and *what factors/constraints influenced it* based strictly on local database context.
+- **Gemini quota conservation**: Gemini is strictly bypassed for decision explanations, preserving token quotas and avoiding unnecessary costs.
+
+---
+
 ## Privacy Model
 
 Student Life OS is designed around privacy-first handling of personal academic and career data.
@@ -170,12 +184,13 @@ Student Life OS is designed around privacy-first handling of personal academic a
 
 ### Data sent externally
 
-Only necessary, sanitized data is sent to Gemini and limited external adapters. This includes:
+Only necessary, sanitized data is sent to external AI providers (Gemini and Featherless AI) and limited external adapters:
 
 - extracted task title/context
 - dates or deadlines
 - compact opportunity metadata
 - minimal document snippets for parsing
+- grounded decision context (action, reason, constraints) sent to Featherless AI **only** when an explanation is explicitly requested
 
 ### Data treated as untrusted
 
@@ -294,8 +309,12 @@ npm install
 Create a local `.env` file based on `.env.example`.
 
 ```env
-GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY=your_gemini_key_here
 GEMINI_MODEL=gemini-1.5-flash
+FEATHERLESS_API_KEY=your_featherless_key_here
+FEATHERLESS_MODEL=Qwen/Qwen2.5-1.5B-Instruct
+FEATHERLESS_API_URL=https://api.featherless.ai/v1/chat/completions
+FEATHERLESS_TIMEOUT_SECONDS=30
 APP_ENV=development
 DATABASE_URL=sqlite:///./data/sqlite/student_life_os.db
 UPLOAD_DIR=./data/uploads

@@ -126,3 +126,63 @@ def get_agent_history(
         }
         for a in actions
     ]
+
+
+class ExplainDecisionRequest(BaseModel):
+    query: str | None = Field(default=None, description="User's natural language question or why/explain prompt")
+    decision_id: int | None = Field(default=None, description="Optional ID of the decision or email to explain")
+    decision_type: str | None = Field(default=None, description="Optional type of decision: 'email', 'action', or 'activity'")
+
+
+class ExplainDecisionResponse(BaseModel):
+    success: bool
+    decision_id: int | None
+    decision_type: str | None
+    decision_summary: str | None
+    brief_reason: str | None
+    explanation: str
+    provider: str = "featherless_ai"
+    model: str
+
+
+@router.post("/explain", response_model=ExplainDecisionResponse)
+async def explain_decision(
+    request: ExplainDecisionRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ExplainDecisionResponse:
+    """
+    On-demand model decision explanation powered by Featherless AI.
+    Strictly bypasses Gemini API and returns a concise, grounded explanation
+    of what decision was made, why it was made, and what factors/constraints influenced it.
+    """
+    from app.services.decision_context_service import DecisionContextService
+    from app.services.featherless_service import FeatherlessService
+
+    ctx = DecisionContextService.get_relevant_decision(
+        user_id=user_id,
+        db=db,
+        query=request.query,
+        decision_id=request.decision_id,
+        decision_type=request.decision_type,
+    )
+    if not ctx:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No relevant decision context found to explain.",
+        )
+
+    featherless = FeatherlessService()
+    explanation = await featherless.explain_decision(ctx, user_query=request.query)
+
+    return ExplainDecisionResponse(
+        success=True,
+        decision_id=ctx.get("decision_id"),
+        decision_type=ctx.get("decision_type"),
+        decision_summary=ctx.get("decision_summary"),
+        brief_reason=ctx.get("brief_reason"),
+        explanation=explanation,
+        provider="featherless_ai",
+        model=featherless.model,
+    )
+

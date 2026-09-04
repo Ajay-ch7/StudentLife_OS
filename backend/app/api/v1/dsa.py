@@ -129,3 +129,17 @@ def leetcode_status(user_id: int = Depends(get_current_user_id), db: Session = D
         "last_submission_id": state.last_submission_id,
         "last_polled_at": state.last_polled_at.isoformat() if state.last_polled_at else None,
     }
+
+
+@router.get("/roles")
+def list_dsa_role_requirements() -> dict[str, Any]:
+    """Exposes all per-role DSA requirement tabs and topics for cross-agent readiness evaluation."""
+    from app.services.dsa_role_requirements import ROLE_REQUIREMENTS_TABS
+    return {"roles": ROLE_REQUIREMENTS_TABS}
+
+
+@router.get("/readiness/{role_name}")
+def get_role_technical_readiness(role_name: str, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Computes technical readiness score against a specific role tab using verified LeetCode progress."""
+    from app.services.dsa_role_requirements import compute_role_readiness
+    return compute_role_readiness(db, user_id, role_name)

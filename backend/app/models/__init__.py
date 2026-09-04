@@ -14,6 +14,7 @@ from app.models.leetcode_state import LeetCodeState
 from app.models.email_message import EmailMessage
 from app.models.exam import Exam
 from app.models.opportunity import Opportunity
+from app.models.job_pipeline import ActiveJobPipeline
 from app.models.note import Note
 from app.models.project import Project
 from app.models.student_profile import StudentProfile, User
@@ -28,6 +29,7 @@ __all__ = [
 	"AgentAction",
 	"ApprovalRequest",
 	"Application",
+	"ActiveJobPipeline",
 	"Assignment",
 	"CalendarEvent",
 	"Course",

@@ -3,6 +3,7 @@ from typing import Any
 
 from app.integrations.gemini_client import GeminiClient
 from app.schemas.email_workflow_schemas import EmailReasoningDecision
+from app.schemas.job_schemas import JobParseResult, SOPGenerateResult
 from app.schemas.gemini_schemas import (
     ContentClassificationResult,
     MorningBriefingResult,
@@ -14,9 +15,11 @@ from app.services.prompt_builder import (
     build_content_classification_prompt,
     build_email_action_reasoning_prompt,
     build_extraction_prompt,
+    build_job_parsing_prompt,
     build_minimal_profile_context,
     build_morning_briefing_prompt,
     build_opportunity_analysis_prompt,
+    build_sop_generation_prompt,
     build_study_plan_prompt,
 )
 from app.services.schema_validation import validate_structured_output
@@ -124,4 +127,41 @@ class GeminiService:
             system_instruction="You are OpenClaw's autonomous reasoning engine for StudentLife OS. Return only valid JSON matching the requested schema.",
         )
         return validate_structured_output(raw_json, EmailReasoningDecision)
+
+    async def parse_job_posting(
+        self,
+        job_text: str,
+        profile: Any = None,
+    ) -> JobParseResult:
+        """Parse raw job description into structured criteria and calculate match score."""
+        profile_context = build_minimal_profile_context(profile)
+        prompt = build_job_parsing_prompt(job_text, profile_context)
+        raw_json = await self.client.generate_json(
+            prompt=prompt,
+            system_instruction="You are the Student Life OS Career Intelligence engine. Extract structured job criteria strictly in valid JSON.",
+        )
+        return validate_structured_output(raw_json, JobParseResult)
+
+    async def generate_sop_draft(
+        self,
+        job_data: dict[str, Any],
+        profile_data: dict[str, Any],
+        readiness_data: dict[str, Any],
+        preferences: dict[str, Any] | None = None,
+    ) -> SOPGenerateResult:
+        """
+        Autonomously generate a personalized, rigorously grounded Statement of Purpose (SOP) draft.
+        Enforces strict traceability to verified profile and job data with zero hallucination.
+        """
+        prompt = build_sop_generation_prompt(
+            job_data=job_data,
+            profile_data=profile_data,
+            readiness_data=readiness_data,
+            preferences=preferences,
+        )
+        raw_json = await self.client.generate_json(
+            prompt=prompt,
+            system_instruction="You are an expert career counselor generating authentic, grounded Statements of Purpose. Never hallucinate achievements.",
+        )
+        return validate_structured_output(raw_json, SOPGenerateResult)
 
