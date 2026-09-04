@@ -1,0 +1,15 @@
+{
+  "include": [
+    "backend",
+    "openclaw",
+    "tests"
+  ],
+  "extraPaths": [
+    "./backend",
+    "./openclaw",
+    "."
+  ],
+  "pythonPath": "./venv/Scripts/python.exe",
+  "venvPath": ".",
+  "venv": "venv"
+}

@@ -33,8 +33,9 @@ def main() -> int:
 
     environment = os.environ.copy()
     backend_path = str(ROOT_DIR / "backend")
+    root_path = str(ROOT_DIR)
     environment["PYTHONPATH"] = os.pathsep.join(
-        [backend_path, environment.get("PYTHONPATH", "")]
+        [backend_path, root_path, environment.get("PYTHONPATH", "")]
     ).rstrip(os.pathsep)
     python_command = get_python_command()
 

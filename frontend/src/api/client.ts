@@ -18,6 +18,36 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type InboxProcessResponse = {
+  workflow_id: string;
+  status: string;
+  summary: string;
+  total_extracted: number;
+  tasks_created: Array<{ id: number | null; title: string; deadline: string | null; priority: string; category: string | null }>;
+  skipped_duplicates: string[];
+  detected_conflicts: Array<{ task_title: string; deadline: string; conflicts: Array<{ id: number; title: string; starts_at: string; ends_at: string }> }>;
+  dry_run: boolean;
+};
+
+export type MorningBriefingResponse = {
+  workflow_id: string;
+  status: string;
+  student_name: string;
+  briefing: {
+    greeting: string;
+    quote_or_motto: string | null;
+    top_priorities: string[];
+    schedule_overview: string;
+    urgent_alerts: string[];
+    recommended_recovery_action: string | null;
+  };
+  formatted_text: string;
+  delivery_status: string;
+  mocked_delivery: boolean;
+  tasks_count: number;
+  events_today_count: number;
+};
+
 export const api = {
   getProfile: () => request<ProfileResponse>('/profile'),
   saveProfile: (profile: ProfileInput, id?: number) => request<ProfileResponse>(id ? `/profile/${id}` : '/profile', { method: id ? 'PUT' : 'POST', body: JSON.stringify(profile) }),
@@ -29,4 +59,8 @@ export const api = {
   checkCalendarConflicts: (event: CalendarEventInput) => request<Conflict>('/calendar/conflicts', { method: 'POST', body: JSON.stringify(event) }),
   createCalendarEvent: (event: CalendarEventInput) => request<CalendarEvent>('/calendar/events', { method: 'POST', body: JSON.stringify(event) }),
   getApprovals: () => request<Approval[]>('/approvals'),
+  processInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/process', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
+  previewInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/preview', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
+  generateBriefing: (send_notification = false, chat_id?: string) => request<MorningBriefingResponse>('/workflows/morning-briefing', { method: 'POST', body: JSON.stringify({ send_notification, chat_id }) }),
+  getNotifications: () => request<Array<{ id: number; type: string; message: string; metadata: string | null; created_at: string }>>('/notifications'),
 };
