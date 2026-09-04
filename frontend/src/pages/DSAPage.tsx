@@ -1,0 +1,4 @@
+import { useEffect, useState } from 'react';
+import { api, type DSAProgress } from '../api/client';
+
+export default function DSAPage() { const [data, setData] = useState<DSAProgress | null>(null); useEffect(() => { api.getDsa().then(setData).catch(() => setData(null)); }, []); return <section><div className="section-heading"><div><p className="eyebrow">Practice ledger</p><h2>DSA progress</h2></div><span className="number">{data?.streak || 0} day streak</span></div><div className="grid"><div className="card"><h2>Solved</h2><p className="number">{data?.total || 0}</p></div><div className="card"><h2>Topics</h2><p>{data ? Object.entries(data.topics).map(([topic, count]) => `${topic}: ${count}`).join(' · ') : 'No data yet'}</p></div><div className="card"><h2>Next recommendation</h2><p>{data?.weak_topics.length ? `Practice ${data.weak_topics[0]}` : 'Keep your current rhythm.'}</p></div></div></section>; }

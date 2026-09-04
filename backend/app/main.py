@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import agent, briefing, calendar, inbox, profile, resources, tasks, tools
+from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, focus, inbox, opportunities, profile, resources, tasks, tools
 from app.core.config import ensure_data_directories
 from app.core.exceptions import unhandled_exception_handler
 from app.core.logging import configure_logging
@@ -29,6 +29,11 @@ app.include_router(inbox.router, prefix="/api/v1")
 app.include_router(briefing.router, prefix="/api/v1")
 app.include_router(tools.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
+app.include_router(approvals.router, prefix="/api/v1")
+app.include_router(academic.router, prefix="/api/v1")
+app.include_router(opportunities.router, prefix="/api/v1")
+app.include_router(dsa.router, prefix="/api/v1")
+app.include_router(focus.router, prefix="/api/v1")
 app.include_router(resources.router, prefix="/api/v1")
 
 

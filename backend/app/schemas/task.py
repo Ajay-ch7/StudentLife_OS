@@ -14,7 +14,7 @@ class TaskInput(BaseModel):
     status: str = "pending"
     priority: str = "medium"
     category: str | None = Field(default=None, max_length=100)
-    estimated_effort_hours: int | None = Field(default=None, ge=1, le=1000)
+    estimated_effort_hours: float | None = Field(default=None, ge=1, le=1000)
     source: str | None = Field(default=None, max_length=100)
     is_confirmed_deadline: bool = True
 
@@ -48,7 +48,7 @@ class TaskUpdate(BaseModel):
     status: str | None = None
     priority: str | None = None
     category: str | None = Field(default=None, max_length=100)
-    estimated_effort_hours: int | None = Field(default=None, ge=1, le=1000)
+    estimated_effort_hours: float | None = Field(default=None, ge=1, le=1000)
     source: str | None = Field(default=None, max_length=100)
     is_confirmed_deadline: bool | None = None
 
@@ -88,7 +88,7 @@ class TaskResponse(BaseModel):
     status: str
     priority: str
     category: str | None = None
-    estimated_effort_hours: int | None = None
+    estimated_effort_hours: float | None = None
     source: str | None = None
     is_confirmed_deadline: bool
     is_overdue: bool = False

@@ -10,7 +10,12 @@ export type Task = { id: number; user_id: number; title: string; description: st
 export type CalendarEvent = { id: number; user_id: number; task_id: number | null; title: string; description: string | null; starts_at: string; ends_at: string; event_type: string; location: string | null };
 export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'user_id'>;
 export type Conflict = { has_conflict: boolean; reasons: string[] };
-export type Approval = { id: number; action_type: string; description: string; status: string };
+export type Approval = { id: number; action_type: string; description: string; metadata_json?: string | null; expires_at?: string | null; result_json?: string | null; status: string };
+export type Assignment = { id: number; course_name: string; title: string; description: string | null; due_at: string; status: string };
+export type Exam = { id: number; course_name: string; title: string; starts_at: string; notes: string | null };
+export type StudySession = { id: number; topic: string; task_id: number | null; planned_start: string; planned_end: string; actual_start: string | null; actual_end: string | null; status: string };
+export type Opportunity = { id: number; title: string; company: string; description: string; required_skills: string | null; match_score: number | null; source: string };
+export type DSAProgress = { total: number; streak: number; topics: Record<string, number>; weak_topics: string[]; problems: Array<{ id: number; title: string; topic: string; difficulty: string; solved_on: string; needs_revision: boolean }> };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -59,6 +64,18 @@ export const api = {
   checkCalendarConflicts: (event: CalendarEventInput) => request<Conflict>('/calendar/conflicts', { method: 'POST', body: JSON.stringify(event) }),
   createCalendarEvent: (event: CalendarEventInput) => request<CalendarEvent>('/calendar/events', { method: 'POST', body: JSON.stringify(event) }),
   getApprovals: () => request<Approval[]>('/approvals'),
+  createApproval: (approval: { action_type: string; description: string; metadata_json?: string; expires_at?: string }) => request<Approval>('/approvals', { method: 'POST', body: JSON.stringify(approval) }),
+  approve: (id: number) => request<Approval>(`/approvals/${id}/approve`, { method: 'PUT', body: '{}' }),
+  reject: (id: number) => request<Approval>(`/approvals/${id}/reject`, { method: 'PUT', body: '{}' }),
+  getAssignments: () => request<Assignment[]>('/academic/assignments'),
+  getExams: () => request<Exam[]>('/academic/exams'),
+  getStudySessions: () => request<StudySession[]>('/academic/study-sessions'),
+  requestRecovery: () => request<{ approval_request_id: number | null }>('/focus/recovery', { method: 'POST', body: '{}' }),
+  startFocusSession: (id: number) => request<StudySession>(`/focus/sessions/${id}/start`, { method: 'PUT', body: '{}' }),
+  endFocusSession: (id: number) => request<StudySession>(`/focus/sessions/${id}/end`, { method: 'PUT', body: '{}' }),
+  getOpportunities: () => request<Opportunity[]>('/opportunities'),
+  getDsa: () => request<DSAProgress>('/dsa'),
+  getDsaRecommendations: () => request<{ topics: string[]; recommendation: string }>('/dsa/recommendations'),
   processInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/process', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   previewInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/preview', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   generateBriefing: (send_notification = false, chat_id?: string) => request<MorningBriefingResponse>('/workflows/morning-briefing', { method: 'POST', body: JSON.stringify({ send_notification, chat_id }) }),

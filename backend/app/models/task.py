@@ -17,7 +17,7 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(50), default="pending", index=True)
     priority: Mapped[str] = mapped_column(String(50), default="medium", index=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    estimated_effort_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_effort_hours: Mapped[float | None] = mapped_column(Integer, nullable=True)
     source: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_confirmed_deadline: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(

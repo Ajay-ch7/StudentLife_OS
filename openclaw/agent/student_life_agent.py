@@ -1,5 +1,6 @@
 import logging
 import uuid
+import json
 from typing import Any
 from sqlalchemy.orm import Session
 
@@ -66,6 +67,7 @@ class StudentLifeAgent:
                 {
                     "action_type": tool_name,
                     "description": f"Agent wants to execute {tool_name} with parameters: {parameters}",
+                    "metadata_json": json.dumps({"tool_name": tool_name, "parameters": parameters}, default=str),
                 },
                 user_id,
                 db,

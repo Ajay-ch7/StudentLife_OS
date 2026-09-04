@@ -1,0 +1,11 @@
+import { useEffect, useState } from 'react';
+import { api, type StudySession } from '../api/client';
+
+export default function FocusPage() {
+	const [sessions, setSessions] = useState<StudySession[]>([]); const [recovery, setRecovery] = useState<number | null>(null); const [activeSince, setActiveSince] = useState<number | null>(null); const [now, setNow] = useState(Date.now());
+	useEffect(() => { api.getStudySessions().then(setSessions).catch(() => setSessions([])); }, []);
+	useEffect(() => { if (!activeSince) return; const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, [activeSince]);
+	async function update(item: StudySession) { const updated = item.status === 'in_progress' ? await api.endFocusSession(item.id) : await api.startFocusSession(item.id); setSessions((items) => items.map((current) => current.id === updated.id ? updated : current)); setActiveSince(updated.status === 'in_progress' ? Date.now() : null); }
+	async function review() { const result = await api.requestRecovery(); setRecovery(result.approval_request_id); }
+	return <section><div className="section-heading"><div><p className="eyebrow">Daily recovery</p><h2>Focus sessions</h2></div><button className="primary-button" onClick={review}>Review day</button></div>{recovery !== null && <div className="notice">Recovery proposal sent for approval.</div>}<div className="task-list">{sessions.length ? sessions.map((item) => <article className="task-row" key={item.id}><div><strong>{item.topic}</strong><p className="muted">{new Date(item.planned_start).toLocaleString()} · planned until {new Date(item.planned_end).toLocaleTimeString()}{item.status === 'in_progress' && activeSince ? ` · ${Math.floor((now - activeSince) / 60000)} min active` : ''}</p></div>{item.status === 'completed' ? <span className="task-status">Completed</span> : <button className="secondary-button" onClick={() => update(item)}>{item.status === 'in_progress' ? 'End session' : 'Start session'}</button>}</article>) : <p className="empty-state">No focus sessions planned.</p>}</div></section>;
+}

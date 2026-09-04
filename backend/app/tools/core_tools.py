@@ -415,20 +415,27 @@ def analyze_skill_gap(payload: AnalyzeSkillGapInput, user_id: int, db: Session) 
     description="Retrieve student's DSA progress, topic mastery, and suggested revision items.",
 )
 def get_dsa_progress(payload: GetDSAProgressInput, user_id: int, db: Session) -> dict[str, Any]:
-    # Mock / calculated DSA tracking
-    topics = [
-        {"topic": "Arrays & Hashing", "solved": 45, "confidence": "high", "last_revised_days_ago": 4},
-        {"topic": "Two Pointers & Sliding Window", "solved": 28, "confidence": "high", "last_revised_days_ago": 7},
-        {"topic": "Trees & Binary Search Trees", "solved": 32, "confidence": "medium", "last_revised_days_ago": 12},
-        {"topic": "Dynamic Programming", "solved": 18, "confidence": "low", "last_revised_days_ago": 16},
-        {"topic": "Graphs", "solved": 14, "confidence": "medium", "last_revised_days_ago": 20},
-    ]
+    from app.models.dsa_problem import DSAProblem
+
+    problems = db.query(DSAProblem).filter(DSAProblem.user_id == user_id).all()
     if payload.topic:
-        topics = [t for t in topics if payload.topic.lower() in t["topic"].lower()]
+        problems = [problem for problem in problems if payload.topic.lower() in problem.topic.lower()]
+    grouped: dict[str, list[DSAProblem]] = {}
+    for problem in problems:
+        grouped.setdefault(problem.topic, []).append(problem)
+    topics = [
+        {
+            "topic": topic,
+            "solved": len(items),
+            "confidence": "low" if sum(item.needs_revision for item in items) else "medium",
+            "last_revised_days_ago": None,
+        }
+        for topic, items in sorted(grouped.items())
+    ]
     return {
-        "total_solved": sum(t["solved"] for t in topics),
+        "total_solved": len(problems),
         "topics": topics,
-        "revision_needed": [t["topic"] for t in topics if t["confidence"] == "low" or t["last_revised_days_ago"] > 14],
+        "revision_needed": [t["topic"] for t in topics if t["confidence"] == "low"],
     }
 
 
@@ -510,21 +517,13 @@ async def send_telegram_message(payload: SendTelegramMessageToolInput, user_id: 
     description="Create a pending approval request for the student to approve high-impact actions.",
 )
 def create_approval_request(payload: CreateApprovalRequestToolInput, user_id: int, db: Session) -> dict[str, Any]:
-    req = ApprovalRequest(
+    from app.services.approval_service import ApprovalService
+
+    req = ApprovalService.create(
+        db=db,
         user_id=user_id,
         action_type=payload.action_type,
         description=payload.description,
-        status="pending",
-    )
-    db.add(req)
-    db.commit()
-    db.refresh(req)
-
-    AuditService.log_user_activity(
-        db=db,
-        user_id=user_id,
-        activity_type="approval_requested",
-        message=f"Approval requested for {payload.action_type}: {payload.description}",
-        metadata={"request_id": req.id},
+        metadata_json=payload.metadata_json,
     )
     return {"id": req.id, "action_type": req.action_type, "status": req.status}

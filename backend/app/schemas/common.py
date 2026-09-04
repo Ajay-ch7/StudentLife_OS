@@ -59,7 +59,7 @@ class TaskResponse(APIModel):
     status: str
     priority: str
     category: str | None = None
-    estimated_effort_hours: int | None = None
+    estimated_effort_hours: float | None = None
     source: str | None = None
     is_confirmed_deadline: bool
 
@@ -94,6 +94,9 @@ class ApprovalResponse(APIModel):
     id: int
     action_type: str
     description: str
+    metadata_json: str | None = None
+    expires_at: datetime | None = None
+    result_json: str | None = None
     status: str
     requested_at: datetime
     resolved_at: datetime | None = None

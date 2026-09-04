@@ -1,0 +1,4 @@
+import { useEffect, useState } from 'react';
+import { api, type Opportunity } from '../api/client';
+
+export default function OpportunitiesPage() { const [items, setItems] = useState<Opportunity[]>([]); useEffect(() => { api.getOpportunities().then(setItems).catch(() => setItems([])); }, []); return <section><div className="section-heading"><div><p className="eyebrow">Career radar</p><h2>Opportunities</h2></div><span className="muted">{items.length} tracked</span></div><div className="task-list">{items.length ? items.map((item) => <article className="task-row" key={item.id}><div><strong>{item.title}</strong><p className="muted">{item.company} · {item.required_skills || 'No skills listed'}</p></div><span className="number">{Math.round(item.match_score || 0)}%</span></article>) : <p className="empty-state">Add a curated opportunity to begin matching.</p>}</div></section>; }

@@ -10,6 +10,10 @@ from app.models.agent_action import AgentAction
 from openclaw.workflows.briefing_workflow import MorningBriefingWorkflow
 from openclaw.workflows.inbox_workflow import InboxProcessingWorkflow
 from openclaw.workflows.opportunity_workflow import OpportunityEvaluationWorkflow
+from openclaw.workflows.dsa_workflow import DSARecommendationWorkflow
+from openclaw.workflows.end_of_day_review import EndOfDayReviewWorkflow
+from openclaw.workflows.course_planning import CoursePlanningWorkflow
+from openclaw.workflows.opportunity_updates import OpportunityUpdateWorkflow
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -17,11 +21,15 @@ WORKFLOWS = {
     "inbox_processing": InboxProcessingWorkflow,
     "morning_briefing": MorningBriefingWorkflow,
     "opportunity_evaluation": OpportunityEvaluationWorkflow,
+    "dsa_recommendation": DSARecommendationWorkflow,
+    "end_of_day_review": EndOfDayReviewWorkflow,
+    "course_planning": CoursePlanningWorkflow,
+    "opportunity_updates": OpportunityUpdateWorkflow,
 }
 
 
 class RunWorkflowRequest(BaseModel):
-    workflow_name: Literal["inbox_processing", "morning_briefing", "opportunity_evaluation"]
+    workflow_name: Literal["inbox_processing", "morning_briefing", "opportunity_evaluation", "dsa_recommendation", "end_of_day_review", "course_planning", "opportunity_updates"]
     payload: dict[str, Any] = Field(default_factory=dict)
 
 

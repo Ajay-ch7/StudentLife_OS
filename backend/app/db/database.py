@@ -32,6 +32,14 @@ def init_db() -> None:
 			event_columns = {column["name"] for column in inspect(connection).get_columns("calendar_events")}
 			if "task_id" not in event_columns:
 				connection.execute(text("ALTER TABLE calendar_events ADD COLUMN task_id INTEGER"))
+			approval_columns = {column["name"] for column in inspect(connection).get_columns("approval_requests")}
+			for column, column_type in {
+				"metadata_json": "TEXT",
+				"expires_at": "DATETIME",
+				"result_json": "TEXT",
+			}.items():
+				if column not in approval_columns:
+					connection.execute(text(f"ALTER TABLE approval_requests ADD COLUMN {column} {column_type}"))
 
 
 def get_db() -> Generator:
