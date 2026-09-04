@@ -1,3 +1,4 @@
+import html
 import logging
 from typing import Any
 from sqlalchemy.orm import Session
@@ -35,47 +36,93 @@ class DSARecommendationWorkflow(BaseWorkflow):
         # Get existing DSA summary
         summary = DSAService.summary(db, user_id)
         weak_topics = summary.get("weak_topics", [])
+        streak = summary.get("streak", 0)
+        total = total_solved if total_solved is not None else summary.get("total", 0)
+        user_display = username or summary.get("username", "student")
 
-        # Generate recommendation using Gemini or smart fallback
+        # Group newly solved problems cleanly by topic/category
+        grouped_problems: dict[str, list[dict[str, Any]]] = {}
+        for item in newly_solved:
+            topic = item.get("topic") or "General"
+            grouped_problems.setdefault(topic, []).append(item)
+
+        # Generate recommendation using Gemini or personalized smart fallback
         recommendation_text = ""
         if newly_solved:
-            latest = newly_solved[0]
-            title = latest.get("title", "Problem")
-            diff = latest.get("difficulty", "Medium")
-            topic = latest.get("topic", "General")
+            topic_summary_parts = []
+            for topic, probs in grouped_problems.items():
+                diffs = [p.get("difficulty", "Medium") for p in probs]
+                topic_summary_parts.append(f"{topic} ({', '.join(diffs)})")
+            solved_summary_str = "; ".join(topic_summary_parts)
 
             rec_prompt = (
-                f"Student solved a new LeetCode problem: '{title}' (Difficulty: {diff}, Topic: {topic}). "
-                f"Total solved so far: {total_solved or summary['total']}. Current streak: {summary['streak']} days. "
+                f"Student solved new LeetCode problem(s): {solved_summary_str}. "
+                f"Total solved so far: {total}. Current streak: {streak} days. "
                 f"Weak topics needing practice: {', '.join(weak_topics[:3]) if weak_topics else 'None'}. "
-                "Provide a 2-sentence encouraging analysis and specific recommendation for their next DSA practice step."
+                "Provide a concise, personalized 1-2 sentence OpenClaw recommendation for their next DSA practice step based on these solved topics and difficulties. Avoid excessive emojis or fluff."
             )
             try:
-                recommendation_text = await self.gemini.client.generate_text(prompt=rec_prompt)
+                raw_rec = await self.gemini.client.generate_text(prompt=rec_prompt)
+                recommendation_text = raw_rec.strip() if raw_rec else ""
             except Exception as err:
                 logger.warning("Gemini recommendation generation fallback due to: %s", err)
-                next_topic = weak_topics[0] if weak_topics else "Dynamic Programming"
-                recommendation_text = f"Great work solving '{title}'! To maintain momentum, try tackling a medium problem in '{next_topic}' next."
 
-        # Build Telegram update message
-        if newly_solved:
-            problems_str = "\n".join(
-                [f"• <b>{p.get('title')}</b> ({p.get('difficulty')}) — <i>{p.get('topic')}</i>" for p in newly_solved]
+            if not recommendation_text:
+                solved_topics_list = list(grouped_problems.keys())
+                topics_str = ", ".join(solved_topics_list[:2])
+                next_topic = weak_topics[0] if weak_topics else "Dynamic Programming"
+                recommendation_text = (
+                    f"Great progress solving problems in {topics_str}. "
+                    f"To keep building mastery, try tackling a Medium problem in {next_topic} next."
+                )
+        else:
+            rec_prompt = (
+                f"Student's current DSA stats — Total Solved: {total}, Streak: {streak} days. "
+                f"Weak topics needing practice: {', '.join(weak_topics[:3]) if weak_topics else 'None'}. "
+                "Provide a concise 1-sentence encouraging recommendation for their daily DSA practice. Avoid excessive emojis."
             )
+            try:
+                raw_rec = await self.gemini.client.generate_text(prompt=rec_prompt)
+                recommendation_text = raw_rec.strip() if raw_rec else ""
+            except Exception as err:
+                logger.warning("Gemini recommendation generation fallback due to: %s", err)
+
+            if not recommendation_text:
+                next_topic = weak_topics[0] if weak_topics else "Arrays & Hashing"
+                recommendation_text = f"Maintain your daily momentum with a Medium problem in {next_topic}."
+
+        # Build clean, structured Telegram HTML notification
+        user_header = f"👤 <b>User:</b> @{html.escape(user_display)}\n" if user_display else ""
+
+        if newly_solved:
+            grouped_blocks = []
+            for topic, probs in grouped_problems.items():
+                prob_lines = [
+                    f"  • {html.escape(p.get('title', 'Problem'))} (<i>{html.escape(p.get('difficulty', 'Medium'))}</i>)"
+                    for p in probs
+                ]
+                grouped_blocks.append(f"<b>{html.escape(topic)}</b>\n" + "\n".join(prob_lines))
+
+            newly_solved_section = "\n\n".join(grouped_blocks)
+
             telegram_msg = (
-                "🎯 <b>LeetCode Goal Update</b>\n\n"
-                f"👤 <b>User:</b> @{username or 'student'}\n"
-                f"🔥 <b>Streak:</b> {summary['streak']} days\n"
-                f"📊 <b>Total Solved:</b> {total_solved or summary['total']}\n\n"
-                f"✅ <b>Newly Solved:</b>\n{problems_str}\n\n"
-                f"💡 <b>OpenClaw Recommendation:</b>\n{recommendation_text}"
+                "📈 <b>DSA Progress Update</b>\n\n"
+                f"{user_header}"
+                f"🔥 <b>Streak:</b> {streak} days\n"
+                f"📊 <b>Total Solved:</b> {total}\n\n"
+                f"<b>Newly Solved</b>\n\n"
+                f"{newly_solved_section}\n\n"
+                f"💡 <b>OpenClaw Recommendation:</b>\n"
+                f"{html.escape(recommendation_text)}"
             )
         else:
             telegram_msg = (
-                "🎯 <b>DSA Practice Summary</b>\n\n"
-                f"📊 <b>Total Solved:</b> {summary['total']}\n"
-                f"🔥 <b>Streak:</b> {summary['streak']} days\n"
-                f"💡 <b>Recommendation:</b> Keep up the consistent daily practice!"
+                "📈 <b>DSA Progress Summary</b>\n\n"
+                f"{user_header}"
+                f"🔥 <b>Streak:</b> {streak} days\n"
+                f"📊 <b>Total Solved:</b> {total}\n\n"
+                f"💡 <b>OpenClaw Recommendation:</b>\n"
+                f"{html.escape(recommendation_text)}"
             )
 
         # Dispatch Telegram message if chat ID is configured
@@ -103,3 +150,4 @@ class DSARecommendationWorkflow(BaseWorkflow):
             "telegram_sent": telegram_sent,
             "summary": summary,
         }
+

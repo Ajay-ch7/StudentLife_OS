@@ -52,7 +52,7 @@ export default function App() {
         {data?.profile.profile === null && <Onboarding profile={data.profile} onSaved={(profile) => setData({ ...data, profile })} />}
         {data && data.profile.profile !== null && view === 'tasks' && <TasksPage tasks={data.tasks} onChanged={(tasks) => setData({ ...data, tasks })} />}
         {data && data.profile.profile !== null && view === 'calendar' && <CalendarPage events={data.calendar} onChanged={(calendar) => setData({ ...data, calendar })} />}
-        {data && data.profile.profile !== null && view === 'academic' && <AcademicPage />}
+        {data && data.profile.profile !== null && view === 'academic' && <AcademicPage tasks={data.tasks} />}
         {data && data.profile.profile !== null && view === 'opportunities' && <OpportunitiesPage />}
         {data && data.profile.profile !== null && view === 'dsa' && <DSAPage />}
         {data && data.profile.profile !== null && view === 'approvals' && <ApprovalsPage approvals={data.approvals} onChanged={(approvals) => setData({ ...data, approvals })} />}

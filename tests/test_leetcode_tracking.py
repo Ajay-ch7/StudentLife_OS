@@ -147,3 +147,48 @@ async def test_leetcode_watcher_change_detection_and_openclaw(test_db):
 
     problems_count = session.query(DSAProblem).filter(DSAProblem.user_id == user.id).count()
     assert problems_count == 1
+
+
+@pytest.mark.asyncio
+async def test_dsa_recommendation_workflow_telegram_message_formatting(test_db):
+    session, user = test_db
+
+    workflow = DSARecommendationWorkflow()
+    mock_send = AsyncMock(return_value=MagicMock(mocked=True))
+    workflow.telegram.send_message = mock_send
+
+    payload = {
+        "username": "test_dev & coder",
+        "total_solved": 45,
+        "newly_solved": [
+            {"title": "Two Sum", "difficulty": "Easy", "topic": "Arrays & Hashing"},
+            {"title": "Group Anagrams", "difficulty": "Medium", "topic": "Arrays & Hashing"},
+            {"title": "3Sum", "difficulty": "Medium", "topic": "Two Pointers"},
+        ],
+    }
+
+    res = await workflow.run(user_id=user.id, db=session, payload=payload)
+    assert res["status"] == "completed"
+
+    mock_send.assert_called_once()
+    _, kwargs = mock_send.call_args
+    sent_text = kwargs["text"]
+
+    # Verify header & user info
+    assert "DSA Progress Update" in sent_text
+    assert "<b>Total Solved:</b> 45" in sent_text
+    assert "<b>User:</b> @test_dev &amp; coder" in sent_text
+
+    # Verify grouping by topic
+    assert "<b>Arrays &amp; Hashing</b>" in sent_text
+    assert "• Two Sum (<i>Easy</i>)" in sent_text
+    assert "• Group Anagrams (<i>Medium</i>)" in sent_text
+
+    assert "<b>Two Pointers</b>" in sent_text
+    assert "• 3Sum (<i>Medium</i>)" in sent_text
+
+    # Verify recommendation section
+    assert "<b>OpenClaw Recommendation:</b>" in sent_text
+    assert res["recommendation"] is not None
+    assert len(res["recommendation"]) > 0
+

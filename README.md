@@ -230,14 +230,17 @@ student-life-os/
 │   ├── public/
 │   └── package.json
 ├── backend/
-│   ├── api/
-│   ├── models/
-│   ├── services/
-│   ├── integrations/
-│   ├── tools/
-│   ├── workflows/
-│   ├── app/
 │   └── app/
+│       ├── api/
+│       ├── core/
+│       ├── db/
+│       ├── models/
+│       ├── repositories/
+│       ├── schemas/
+│       ├── services/
+│       ├── integrations/
+│       ├── tools/
+│       └── workflows/
 ├── openclaw/
 │   ├── agent/
 │   ├── workflows/
@@ -245,6 +248,7 @@ student-life-os/
 ├── data/
 │   ├── sqlite/
 │   └── uploads/
+├── scripts/
 ├── tests/
 │   ├── api/
 │   ├── db/
@@ -253,11 +257,11 @@ student-life-os/
 ├── ARCHITECTURE.md
 ├── README.md
 ├── IMPLEMENTATION_PLAN.md
-├── .env.example
 ├── requirements.txt
+├── package.json
+├── pyproject.toml
 ├── start.py
-├── .gitignore
-└── Makefile
+└── .gitignore
 ```
 
 ---
@@ -291,18 +295,38 @@ npm install
 
 ## Environment Variables
 
-Create a local `.env` file based on `.env.example`.
+Create a local `.env` file based on the following template (this project does not use a committed `.env.example`):
 
 ```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-1.5-flash
+# General app config
 APP_ENV=development
+LOG_LEVEL=INFO
+
+# Gemini
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_TIMEOUT_SECONDS=30
+
+# Backend
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
 DATABASE_URL=sqlite:///./data/sqlite/student_life_os.db
 UPLOAD_DIR=./data/uploads
+
+# Frontend
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+
+# Integrations
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 TELEGRAM_MOCK_MODE=true
-LOG_LEVEL=INFO
+TELEGRAM_POLLING_ENABLED=true
+TELEGRAM_POLLING_TIMEOUT_SECONDS=30
+EMAIL_INTEGRATION_MODE=real
+CALENDAR_SYNC_MODE=google
+
+# Leetcode
+LEETCODE_USERNAME=
 ```
 
 Important:
@@ -310,6 +334,7 @@ Important:
 - never commit your real API keys
 - keep secrets local
 - use environment variables instead of hardcoded credentials
+
 
 ---
 
@@ -386,7 +411,7 @@ The MVP focuses on the most valuable daily student workflows:
 - unrestricted crawling of job boards
 - mobile-first app
 - multi-user hosted SaaS deployment
-- deep LeetCode or proprietary platform integration
+- deep LeetCode or proprietary platform integration (basic DSA tracking is supported)
 
 ---
 
@@ -436,9 +461,10 @@ python start.py
 cd frontend && npm run dev
 
 # Utility scripts
-python scripts/seed_demo_data.py      # or: npm run seed
+python scripts/seed_demo_data.py     # or: npm run seed
 python scripts/connect_google.py     # or: npm run connect-google
 python scripts/diagnose.py           # or: npm run diagnose
+python scripts/sync_real_data.py     # or: npm run sync-real
 
 # Tests
 .\venv\Scripts\python.exe -m pytest
