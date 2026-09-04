@@ -85,6 +85,28 @@ def init_db() -> None:
 				if column not in email_columns:
 					connection.execute(text(f"ALTER TABLE email_messages ADD COLUMN {column} {column_type}"))
 
+			# Ensure active_job_pipeline table has all columns
+			if inspect(connection).has_table("active_job_pipeline"):
+				job_columns = {column["name"] for column in inspect(connection).get_columns("active_job_pipeline")}
+				for column, column_type in {
+					"match_score": "FLOAT",
+					"readiness_score": "FLOAT",
+					"role_match": "VARCHAR(50)",
+					"matched_role": "VARCHAR(100)",
+					"technical_strengths": "TEXT",
+					"developing_topics": "TEXT",
+					"sop_draft": "TEXT",
+					"sop_status": "VARCHAR(50) DEFAULT 'not_generated'",
+					"sop_generated_from": "TEXT",
+					"student_preferences": "TEXT",
+					"experience_level": "VARCHAR(100)",
+					"responsibilities": "TEXT",
+					"company_values": "TEXT",
+					"deadline": "VARCHAR(100)",
+				}.items():
+					if column not in job_columns:
+						connection.execute(text(f"ALTER TABLE active_job_pipeline ADD COLUMN {column} {column_type}"))
+
 
 def get_db() -> Generator:
 	db = SessionLocal()

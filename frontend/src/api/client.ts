@@ -106,6 +106,40 @@ export type MorningBriefingResponse = {
   events_today_count: number;
 };
 
+export type ActiveJobPipelineItem = {
+  id: number;
+  user_id: number;
+  title: string;
+  company: string;
+  description: string;
+  source: string;
+  url: string | null;
+  match_score: number | null;
+  readiness_score: number | null;
+  role_match: string | null;
+  matched_role: string | null;
+  technical_strengths: string[];
+  developing_topics: string[];
+  sop_draft: string | null;
+  sop_status: string;
+  sop_generated_from: string[];
+  student_preferences: { tone_preference?: string; specific_points?: string } | null;
+  experience_level: string | null;
+  responsibilities: string[];
+  company_values: string | null;
+  deadline: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type JobActivityItem = {
+  id: number;
+  activity_type: string;
+  message: string;
+  metadata: Record<string, any>;
+  created_at: string | null;
+};
+
 export const api = {
   getProfile: () => request<ProfileResponse>('/profile'),
   saveProfile: (profile: ProfileInput, id?: number) => request<ProfileResponse>(id ? `/profile/${id}` : '/profile', { method: id ? 'PUT' : 'POST', body: JSON.stringify(profile) }),
@@ -129,6 +163,18 @@ export const api = {
   syncLeetCode: () => request<{ status: string; username: string; total_solved: number; newly_solved_count: number }>('/dsa/leetcode/sync', { method: 'POST' }),
   getDsaJobApplications: () => request<JobApplicationDSASummary[]>('/dsa/job-applications'),
   getDsaJobPlan: (applicationId: number) => request<JobDSAPlanDetails>(`/dsa/job-applications/${applicationId}/plan`),
+  getDSARoles: () => request<{ roles: Record<string, any> }>('/dsa/roles'),
+  getDSAReadiness: (roleName: string) => request<any>(`/dsa/readiness/${encodeURIComponent(roleName)}`),
+  // Job Agent & SOP Pipeline API
+  getJobPipeline: () => request<ActiveJobPipelineItem[]>('/jobs/pipeline'),
+  getJobPipelineItem: (id: number) => request<ActiveJobPipelineItem>(`/jobs/pipeline/${id}`),
+  processJobPosting: (payload: { job_text: string; company?: string; title?: string; tone_preference?: string; specific_points?: string }) =>
+    request<ActiveJobPipelineItem>('/jobs/pipeline/process', { method: 'POST', body: JSON.stringify(payload) }),
+  updateSOP: (id: number, sop_draft: string, sop_status = 'reviewed') =>
+    request<ActiveJobPipelineItem>(`/jobs/pipeline/${id}/sop`, { method: 'PUT', body: JSON.stringify({ sop_draft, sop_status }) }),
+  regenerateSOP: (id: number, tone_preference?: string, specific_points?: string) =>
+    request<ActiveJobPipelineItem>(`/jobs/pipeline/${id}/regenerate-sop`, { method: 'POST', body: JSON.stringify({ tone_preference, specific_points }) }),
+  getJobActivity: () => request<JobActivityItem[]>('/jobs/activity'),
   processInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/process', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   previewInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/preview', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   generateBriefing: (send_notification = false, chat_id?: string) => request<MorningBriefingResponse>('/workflows/morning-briefing', { method: 'POST', body: JSON.stringify({ send_notification, chat_id }) }),

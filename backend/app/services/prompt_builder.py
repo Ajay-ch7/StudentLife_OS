@@ -300,3 +300,130 @@ Return a JSON object matching the following structure STRICTLY:
   "draft_response": null
 }}"""
 
+
+def build_job_parsing_prompt(job_text: str, profile_context: dict[str, Any] | None = None) -> str:
+    """Build prompt to parse job description and extract key attributes with profile matching."""
+    safe_text = redact_sensitive_data(job_text)
+    profile_skills = (profile_context or {}).get("skills", "")
+    profile_roles = (profile_context or {}).get("target_roles", "")
+
+    return f"""You are the Student Life OS Career Intelligence engine.
+Analyze the following job description or hiring announcement.
+Extract all structured details and evaluate alignment with the student's background.
+
+STUDENT PROFILE CONTEXT:
+- Stated Skills: {profile_skills or 'Not specified'}
+- Target Roles: {profile_roles or 'General software and tech roles'}
+
+JOB POSTING:
+<job_description>
+{safe_text}
+</job_description>
+
+CRITICAL INSTRUCTIONS:
+1. Extract the specific role title, company name, required skills, required experience level, key responsibilities, company mission/values language, and application deadline (if present).
+2. Calculate overall_match_score (0.0 to 100.0) reflecting the student's technical fit based on stated skills.
+3. Return ONLY a valid JSON object matching the schema below:
+
+{{
+  "role_title": "Clean, normalized job role title",
+  "company": "Company or organization name",
+  "required_skills": ["Skill 1", "Skill 2", "Skill 3"],
+  "required_experience_level": "Internship / Entry Level / 0-1 years",
+  "key_responsibilities": ["Responsibility 1", "Responsibility 2"],
+  "company_values_and_mission": "Key mission or cultural values extracted from posting",
+  "application_deadline": "ISO-8601 string or null",
+  "overall_match_score": 82.5
+}}"""
+
+
+def build_sop_generation_prompt(
+    job_data: dict[str, Any],
+    profile_data: dict[str, Any],
+    readiness_data: dict[str, Any],
+    preferences: dict[str, Any] | None = None,
+) -> str:
+    """
+    Build a structured, strictly grounded prompt for generating a personalized Statement of Purpose.
+    Enforces the non-negotiable constraint: every claim must map directly to real profile/job data.
+    """
+    prefs = preferences or {}
+    tone = prefs.get("tone_preference", "formal")
+    custom_points = prefs.get("specific_points", "")
+
+    student_name = profile_data.get("full_name") or profile_data.get("name") or "Student"
+    degree = profile_data.get("degree") or "B.Tech in Computer Science & Engineering"
+    college = profile_data.get("college") or "University Engineering"
+    year = profile_data.get("year") or "3rd Year"
+    cgpa = profile_data.get("cgpa")
+    skills = profile_data.get("skills") or ""
+
+    company = job_data.get("company", "the Company")
+    role_title = job_data.get("role_title", "Software Engineer")
+    required_skills = ", ".join(job_data.get("required_skills", []))
+    company_values = job_data.get("company_values_and_mission", "")
+    responsibilities = "; ".join(job_data.get("key_responsibilities", []))
+
+    readiness_score = readiness_data.get("readiness_score", 0.0)
+    strengths = ", ".join(readiness_data.get("technical_strengths", [])) or "Core problem solving and data structures"
+    developing = ", ".join(readiness_data.get("developing_topics", [])) or "None identified"
+    is_high_readiness = readiness_score >= 75.0
+
+    guidance_block = (
+        "TONE & STRATEGY: HIGH READINESS (≥75%)\n"
+        "- Adopt a confident, achievement-forward tone.\n"
+        "- Highlight genuine mastery in verified technical strengths.\n"
+        "- Connect verified problem-solving and projects to the company's core responsibilities."
+        if is_high_readiness else
+        "TONE & STRATEGY: MEDIUM / GAP READINESS (60%-74%)\n"
+        "- Adopt an honest, learning-trajectory tone.\n"
+        "- Foreground genuine transferable skills and foundation in verified strengths.\n"
+        "- Honestly frame developing areas as active, disciplined learning goals without fabricating expertise."
+    )
+
+    return f"""You are the Student Life OS Career Advisor creating an autonomous Statement of Purpose (SOP) draft.
+
+NON-NEGOTIABLE CORE CONSTRAINTS:
+1. TRACEABILITY: Every claim, skill, degree, and achievement cited in the draft MUST map strictly to the verified student profile data or job requirements provided below.
+2. ZERO FABRICATION: Do NOT invent metrics, past employers, fake projects, or exaggerated claims. If a judge asks 'where did this sentence come from', it must directly map to an input field.
+3. PERSONALIZATION: Do NOT write a generic mad-libs fill-in-the-blank template. Write a compelling, naturally articulated letter of purpose tailored to {company}.
+
+{guidance_block}
+
+VERIFIED STUDENT PROFILE:
+- Name: {student_name}
+- Education: {degree} ({year}), {college}
+- CGPA: {cgpa or 'Not listed'}
+- Verified Skills: {skills}
+- DSA Technical Readiness Score: {readiness_score}%
+- Verified Strong Topics: {strengths}
+- Developing Topics (Learning Trajectory): {developing}
+- Student Tone Preference: {tone}
+- Student Custom Points to Emphasize: {custom_points or 'None provided'}
+
+TARGET JOB DETAILS:
+- Company: {company}
+- Role: {role_title}
+- Required Skills: {required_skills}
+- Responsibilities: {responsibilities}
+- Mission & Values: {company_values}
+
+RETURN ONLY A VALID JSON OBJECT matching this schema:
+{{
+  "sop_text": "The complete, polished Statement of Purpose letter (3-4 paragraphs)",
+  "tone": "{'confident_achievement' if is_high_readiness else 'growth_trajectory'}",
+  "generated_from": [
+    "profile.degree",
+    "profile.college",
+    "profile.skills",
+    "dsa_strengths: {strengths}",
+    "dsa_developing: {developing}",
+    "job.required_skills",
+    "job.company_values",
+    "student_preferences: {tone}"
+  ],
+  "key_strengths_highlighted": ["Strength 1", "Strength 2"],
+  "growth_areas_framed": ["Topic 1"]
+}}"""
+
+
