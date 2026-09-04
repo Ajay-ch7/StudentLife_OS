@@ -40,6 +40,71 @@ class InboxService:
         return existing is not None
 
     @staticmethod
+    def get_context_snapshot(db: Session, user_id: int) -> dict[str, Any]:
+        """Read-only context snapshot for the Orchestrator. No writes."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+
+        # Pending tasks
+        pending_tasks = (
+            db.query(Task)
+            .filter(Task.user_id == user_id, Task.status.in_(["pending", "in_progress"]))
+            .order_by(Task.deadline.asc().nullslast())
+            .limit(10)
+            .all()
+        )
+        pending_tasks_data = [
+            {
+                "id": t.id,
+                "title": t.title,
+                "deadline": t.deadline.isoformat() if t.deadline else None,
+                "priority": t.priority,
+                "category": t.category,
+            }
+            for t in pending_tasks
+        ]
+
+        # Recent emails (last 5)
+        recent_emails = (
+            db.query(EmailMessage)
+            .filter(EmailMessage.user_id == user_id)
+            .order_by(EmailMessage.id.desc())
+            .limit(5)
+            .all()
+        )
+        recent_emails_data = [
+            {"id": e.id, "subject": e.subject, "sender": e.sender, "processing_status": e.processing_status}
+            for e in recent_emails
+        ]
+
+        # Upcoming deadlines (tasks with deadline in next 7 days)
+        from datetime import timedelta
+        deadline_cutoff = now + timedelta(days=7)
+        upcoming_deadlines = [
+            t for t in pending_tasks
+            if t.deadline and t.deadline.replace(tzinfo=timezone.utc) <= deadline_cutoff
+        ]
+        upcoming_deadlines_data = [
+            {"title": t.title, "deadline": t.deadline.isoformat(), "priority": t.priority}
+            for t in upcoming_deadlines
+        ]
+
+        # Conflict windows for upcoming deadlines
+        conflict_windows_data = []
+        for t in upcoming_deadlines:
+            if t.deadline:
+                conflicts = InboxService.detect_conflicts_for_deadline(db, user_id, t.deadline)
+                if conflicts:
+                    conflict_windows_data.append({"task": t.title, "conflicts": conflicts})
+
+        return {
+            "pending_tasks": pending_tasks_data,
+            "recent_emails": recent_emails_data,
+            "upcoming_deadlines": upcoming_deadlines_data,
+            "conflict_windows": conflict_windows_data,
+        }
+
+    @staticmethod
     def detect_conflicts_for_deadline(
         db: Session,
         user_id: int,

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.gemini_schemas import ExtractedDeadlineItem, ExtractedTaskItem
 
@@ -81,3 +81,13 @@ class EmailReasoningDecision(BaseModel):
     draft_response: EmailDraftItem | None = Field(
         None, description="Content of the drafted email response if applicable"
     )
+
+    @field_validator("draft_response", mode="before")
+    @classmethod
+    def parse_draft_response(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            clean = v.strip()
+            if not clean:
+                return None
+            return {"to": "", "subject": "Re: Inquiry", "body": clean}
+        return v

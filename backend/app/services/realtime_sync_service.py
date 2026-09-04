@@ -81,7 +81,7 @@ class RealtimeSyncService:
             ).first()
 
             # Autonomously trigger only if email is new or unprocessed
-            if not existing or existing.processing_status not in ("processed", "processing"):
+            if not existing or existing.processing_status not in ("processed", "processing", "pending_approval", "failed"):
                 new_count += 1
                 logger.info(
                     "Autonomous Trigger: New email detected '%s' (ID: %s). Initiating OpenClaw workflow.",

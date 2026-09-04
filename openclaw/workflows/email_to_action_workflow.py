@@ -15,6 +15,8 @@ from app.models.task import Task
 from app.schemas.email_workflow_schemas import NormalizedEmail
 from app.services.audit_service import AuditService
 from app.services.inbox_service import InboxService
+from app.services.orchestrator import multi_agent_orchestrator
+from app.schemas.orchestration_schemas import OrchestratorEvent, OrchestratorEventType
 from openclaw.agent.student_life_agent import StudentLifeAgent
 from openclaw.workflows.base_workflow import BaseWorkflow
 
@@ -134,7 +136,31 @@ class EmailToActionWorkflow(BaseWorkflow):
 
         try:
             # -----------------------------------------------------------------
-            # 3. Context Retrieval & LLM Reasoning
+            # 2b. Orchestrator Intercept (cross-agent context before isolated LLM)
+            # -----------------------------------------------------------------
+            try:
+                orch_event = OrchestratorEvent(
+                    event_type=OrchestratorEventType.NEW_EMAIL,
+                    user_id=user_id,
+                    payload=normalized.model_dump(),
+                    workflow_id=f"orch-email-{workflow_id}",
+                )
+                orch_result = await multi_agent_orchestrator.run(orch_event, db)
+                if orch_result.status in ("executed", "pending_approval"):
+                    # Orchestrator handled it — log and continue (don't skip, let isolated logic also run
+                    # for data persistence safety, but note the orchestration outcome)
+                    logger.info(
+                        "Orchestrator result for email workflow %s: status=%s agents=%s",
+                        workflow_id, orch_result.status, orch_result.agents_executed,
+                    )
+                    if orch_result.status == "pending_approval":
+                        existing_email.processing_status = "pending_approval"
+                        db.commit()
+            except Exception as orch_exc:
+                logger.warning("Orchestrator intercept failed (fallback to isolated): %s", orch_exc)
+
+            # -----------------------------------------------------------------
+            # 3. Context Retrieval & LLM Reasoning (isolated — always runs for safety)
             # -----------------------------------------------------------------
             user = db.query(User).filter(User.id == user_id).first()
             active_tasks = (

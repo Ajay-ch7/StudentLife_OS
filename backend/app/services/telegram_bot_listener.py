@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -41,6 +42,23 @@ def is_explanation_request(text: str) -> bool:
         r"\bwhy\s+reschedule\b",
     ]
     return any(re.search(p, clean) for p in explanation_triggers)
+
+
+def is_schedule_shift_request(text: str) -> bool:
+    """Detect if the user is asking to shift/reschedule low-priority items or learning plans to free days."""
+    clean = text.strip().lower()
+    if clean in ("/reschedule", "/optimize", "/shift", "reschedule", "optimize schedule", "shift calendar", "shift events", "shift study sessions"):
+        return True
+
+    shift_triggers = [
+        r"\bshift\b.*(\blow\s*priority\b|\blearning\b|\bstudy\b|\bplan\b|\bevent\b|\bcalender\b|\bcalendar\b)",
+        r"\b(reschedule|move|defer)\b.*(\blow\s*priority\b|\blearning\b|\bstudy\b|\bplan\b|\bevent\b)",
+        r"\b(free\s+day|free\s+days|other\s+days)\b",
+        r"\b(avoid|don'?t)\s+miss\b.*(\binterview\b|\bhigh\s*priority\b|\btask\b)",
+        r"\b(clear|free\s*up)\b.*(\binterview\b|\bcalendar\b|\bday\b)",
+        r"\blow\s+priority\b.*(\bcalender\b|\bcalendar\b|\bshift\b|\bfree\b|\bmove\b|\bdefer\b)",
+    ]
+    return any(re.search(p, clean) for p in shift_triggers)
 
 
 class TelegramBotListener:
@@ -85,6 +103,75 @@ class TelegramBotListener:
         """Proactively send a message to the student via Telegram."""
         await self.send_reply(chat_id=chat_id, text=text)
 
+    async def generate_schedule_shift_proposal(self, user_id: int, db: Session) -> str:
+        """
+        Scan calendar for low-priority events that crowd or clash with high-priority tasks/interviews,
+        and generate a Telegram approval request offering to shift them to free days.
+        """
+        from app.services.scheduling_service import detect_shiftable_low_priority_events
+        shiftable = detect_shiftable_low_priority_events(db, user_id=user_id, days_ahead=7)
+        if not shiftable:
+            return (
+                "✅ *Calendar is Well-Balanced!*\n\n"
+                "No low-priority learning plans conflict with your upcoming high-priority commitments (interviews, exams)."
+            )
+
+        actions = []
+        action_lines = []
+        for item in shiftable:
+            action_item = {
+                "agent": "management",
+                "action": "reschedule_event",
+                "parameters": {
+                    "event_id": item["event_id"],
+                    "event_title": item["event_title"],
+                    "new_start": item["recommended_new_start"],
+                    "new_end": item["recommended_new_end"],
+                },
+                "rationale": f"Shift '{item['event_title']}' to {item['target_day_name']} to protect high-priority '{item['conflicting_high_priority_event']['title']}'",
+            }
+            actions.append(action_item)
+
+            old_dt = datetime.fromisoformat(item["current_starts_at"])
+            new_dt = datetime.fromisoformat(item["recommended_new_start"])
+            old_t = old_dt.strftime("%a, %b %d at %I:%M %p")
+            new_t = new_dt.strftime("%a, %b %d at %I:%M %p")
+            tag = "Completely Free Day" if item.get("target_is_free_day") else "Open Slot"
+            action_lines.append(
+                f"  • *{item['event_title']}*:\n"
+                f"    Current: `{old_t}`\n"
+                f"    Proposed Shift: `{new_t}` ({tag})\n"
+                f"    Reason: {item['conflict_reason']}"
+            )
+
+        orch_id = f"orch-shift-{uuid.uuid4().hex[:6]}"
+        desc = (
+            f"High-priority commitments detected. To protect your interview/exam preparation, "
+            f"shift {len(actions)} low-priority learning session(s) to free days."
+        )
+
+        req = ApprovalService.create(
+            db=db,
+            user_id=user_id,
+            action_type="orchestrated_plan",
+            description=desc,
+            metadata_json=json.dumps({
+                "orchestration_id": orch_id,
+                "event_type": "calendar_optimize",
+                "agent_actions": actions,
+                "telegram_summary": f"Shift {len(actions)} low-priority event(s) to free days to protect high-priority schedule",
+            }),
+        )
+
+        return (
+            f"⚠️ *Schedule Optimization — Awaiting Your Approval*\n"
+            f"Approval ID: #{req.id}\n\n"
+            f"📋 *Reasoning:*\n"
+            f"High-priority commitments (e.g. interviews/exams) were detected on your calendar. "
+            f"To prevent clashes and give you dedicated focus, I propose shifting the following low-priority learning plans to available free days:\n\n"
+            f"📌 *Proposed Shifts:*\n" + "\n\n".join(action_lines) + "\n\n"
+            f"Reply `/approve {req.id}` to confirm this schedule shift, or `/reject {req.id}` to keep your current calendar."
+        )
 
     async def handle_command(self, text: str, user_id: int, db: Session) -> str:
         """Handle predefined Telegram slash commands."""
@@ -98,6 +185,7 @@ class TelegramBotListener:
                 "I am your local AI copilot. Here is what you can do:\n\n"
                 "📅 Calendar & Schedule:\n"
                 "• /calendar - View today's schedule & detect conflicts\n"
+                "• /optimize - Check for clashing low-priority learning plans and propose shifting them to free days\n"
                 "• /sync - Sync with your Google Calendar\n"
                 "• Or text me: \"Add study session at 5pm\" or \"Do I have conflicts tomorrow?\"\n\n"
                 "✉️ Gmail & Inbox:\n"
@@ -109,6 +197,9 @@ class TelegramBotListener:
                 "🌅 Daily Briefing & Tasks:\n"
                 "• /briefing - Get today's morning briefing\n"
                 "• /tasks - View pending academic tasks\n\n"
+                "🤖 Multi-Agent Orchestration:\n"
+                "• /orchestrate - Show the last orchestration decision and agents consulted\n"
+                "• /orchestrate job <text> - Manually trigger a job posting through the full orchestration pipeline\n\n"
                 "🧠 Model Decision Transparency:\n"
                 "• /explain or /why - Get an elaborated explanation of why an autonomous decision was made (powered by Featherless AI)\n\n"
                 "💡 You can also ask me anything in plain English (e.g., 'Check my emails for any assignments')!"
@@ -121,6 +212,64 @@ class TelegramBotListener:
                 return "ℹ️ No recent autonomous decisions found to explain."
             explanation = await self.featherless.explain_decision(ctx, user_query=query_arg)
             return f"🤖 *Decision Explanation (via Featherless AI)*:\n\n{explanation}"
+
+        if cmd == "/orchestrate":
+            if args and args[0] == "job":
+                # Manual job posting orchestration
+                job_text = " ".join(args[1:])
+                if not job_text:
+                    return "Usage: /orchestrate job <job description text>"
+                try:
+                    from app.schemas.orchestration_schemas import OrchestratorEvent, OrchestratorEventType
+                    from app.services.orchestrator import multi_agent_orchestrator
+                    orch_event = OrchestratorEvent(
+                        event_type=OrchestratorEventType.NEW_JOB_POSTING,
+                        user_id=user_id,
+                        payload={"job_text": job_text},
+                    )
+                    result = await multi_agent_orchestrator.run(orch_event, db)
+                    agents = ", ".join(result.agents_consulted) if result.agents_consulted else "none"
+                    executed = ", ".join(result.agents_executed) if result.agents_executed else "none"
+                    summary = result.decision.telegram_summary if result.decision else "No summary"
+                    return (
+                        f"🤖 *Orchestration Result*\n"
+                        f"Status: {result.status}\n"
+                        f"Agents consulted: {agents}\n"
+                        f"Agents executed: {executed}\n\n"
+                        f"📋 Decision: {summary}"
+                    )
+                except Exception as e:
+                    return f"❌ Orchestration error: {e}"
+            else:
+                # Show last orchestration decision from activity_logs
+                try:
+                    from app.models.activity_log import ActivityLog
+                    last_decision = (
+                        db.query(ActivityLog)
+                        .filter(ActivityLog.activity_type == "orchestration_decision")
+                        .order_by(ActivityLog.id.desc())
+                        .first()
+                    )
+                    if not last_decision:
+                        return "ℹ️ No orchestration decisions found yet. They will appear as events are processed."
+                    import json as _json
+                    meta = _json.loads(last_decision.metadata_json or "{}")
+                    agents_consulted = ", ".join(meta.get("agents_consulted", []))
+                    actions = meta.get("agent_actions", [])
+                    action_lines = "\n".join(
+                        f"  • [{a['agent'].upper()}] {a['action']}: {a.get('rationale', '')}"
+                        for a in actions[:5]
+                    )
+                    return (
+                        f"🤖 *Last Orchestration Decision*\n"
+                        f"ID: {meta.get('orchestration_id', 'unknown')}\n"
+                        f"Event: {meta.get('event_type', 'unknown')}\n"
+                        f"Agents consulted: {agents_consulted}\n\n"
+                        f"📋 Summary: {last_decision.message}\n\n"
+                        f"📌 Actions:\n{action_lines}"
+                    )
+                except Exception as e:
+                    return f"❌ Could not retrieve orchestration history: {e}"
 
         if cmd == "/briefing":
             briefing = await self.briefing_service.generate_briefing(db, user_id=user_id, send_notification=False)
@@ -161,11 +310,14 @@ class TelegramBotListener:
 
             if conflicts:
                 lines.append("\n" + "\n".join(conflicts))
-                lines.append("Tip: Ask me to reschedule or find an open slot!")
+                lines.append("Tip: Run /optimize or text me to shift low-priority events to free days!")
             else:
                 lines.append("\n✅ No schedule overlaps detected.")
 
             return "\n".join(lines)
+
+        if cmd in ("/reschedule", "/optimize", "/shift"):
+            return await self.generate_schedule_shift_proposal(user_id, db)
 
         if cmd == "/sync":
             sync_res = await self.tool_bridge.invoke_tool(
@@ -256,17 +408,34 @@ class TelegramBotListener:
             lines.append("\nReply with /approve <id> or /reject <id>")
             return "\n".join(lines)
 
-        if cmd == "/approve" and args:
+        if cmd == "/approve":
             try:
-                req_id = int(args[0])
-                req = (
-                    db.query(ApprovalRequest)
-                    .filter(ApprovalRequest.id == req_id, ApprovalRequest.user_id == user_id)
-                    .first()
-                )
+                if args:
+                    req_id = int(args[0])
+                    req = (
+                        db.query(ApprovalRequest)
+                        .filter(ApprovalRequest.id == req_id, ApprovalRequest.user_id == user_id)
+                        .first()
+                    )
+                else:
+                    req = (
+                        db.query(ApprovalRequest)
+                        .filter(ApprovalRequest.user_id == user_id, ApprovalRequest.status == "pending")
+                        .order_by(ApprovalRequest.requested_at.desc())
+                        .first()
+                    )
+                    if not req:
+                        return "ℹ️ No pending approvals waiting for your review."
+                    req_id = req.id
+
                 if not req:
                     return f"❌ Approval request #{req_id} not found."
-                resolved_req = ApprovalService.resolve(db, req, status="approved")
+
+                if req.status == "approved":
+                    resolved_req = req
+                else:
+                    resolved_req = ApprovalService.resolve(db, req, status="approved")
+
                 if resolved_req.action_type == "send_email_draft":
                     meta = json.loads(resolved_req.metadata_json or "{}")
                     draft_id = meta.get("draft_id")
@@ -275,22 +444,52 @@ class TelegramBotListener:
                             "send_email_draft", {"draft_id": draft_id}, user_id, db, approved=True
                         )
                         return f"✅ Approval #{req_id} confirmed! Gmail draft sent successfully."
+                elif resolved_req.action_type == "orchestrated_plan":
+                    from app.services.orchestrator import multi_agent_orchestrator
+                    exec_results = await multi_agent_orchestrator.execute_approved_plan(
+                        db, user_id, resolved_req
+                    )
+                    ApprovalService.record_result(db, resolved_req, {"status": "executed", "results": exec_results})
+                    action_summaries = []
+                    for r in exec_results:
+                        st = r.get("status", "executed")
+                        note = r.get("note") or r.get("title") or (f"Event #{r.get('event_id')}" if r.get("event_id") else "")
+                        action_summaries.append(f"  • [{r.get('agent', '').upper()}] {r.get('action')}: {st} {f'({note})' if note else ''}")
+                    summary_text = "\n".join(action_summaries)
+                    return (
+                        f"✅ *Approval #{req_id} Approved & Executed!*\n\n"
+                        f"📋 *Executed Actions Across Agents:*\n{summary_text}\n\n"
+                        f"Your Calendar, Tasks, Career pipeline, and DSA prep have been updated."
+                    )
                 return f"✅ Approval #{req_id} ({resolved_req.action_type}) approved!"
             except Exception as e:
                 return f"❌ Failed to approve request: {e}"
 
-        if cmd == "/reject" and args:
+        if cmd == "/reject":
             try:
-                req_id = int(args[0])
-                req = (
-                    db.query(ApprovalRequest)
-                    .filter(ApprovalRequest.id == req_id, ApprovalRequest.user_id == user_id)
-                    .first()
-                )
+                if args:
+                    req_id = int(args[0])
+                    req = (
+                        db.query(ApprovalRequest)
+                        .filter(ApprovalRequest.id == req_id, ApprovalRequest.user_id == user_id)
+                        .first()
+                    )
+                else:
+                    req = (
+                        db.query(ApprovalRequest)
+                        .filter(ApprovalRequest.user_id == user_id, ApprovalRequest.status == "pending")
+                        .order_by(ApprovalRequest.requested_at.desc())
+                        .first()
+                    )
+                    if not req:
+                        return "ℹ️ No pending approvals waiting for your review."
+                    req_id = req.id
+
                 if not req:
                     return f"❌ Approval request #{req_id} not found."
-                ApprovalService.resolve(db, req, status="rejected")
-                return f"🛑 Approval #{req_id} rejected."
+                if req.status != "rejected":
+                    ApprovalService.resolve(db, req, status="rejected")
+                return f"🛑 Approval #{req_id} rejected. No calendar or task changes were made."
             except Exception as e:
                 return f"❌ Failed to reject request: {e}"
 
@@ -310,7 +509,11 @@ class TelegramBotListener:
             explanation = await self.featherless.explain_decision(ctx, user_query=text)
             return f"🤖 *Decision Explanation (via Featherless AI)*:\n\n{explanation}"
 
-        # 2. Normal conversational reasoning and tool execution via Gemini
+        # 2. Schedule shifting / optimization request to free up interview/high-priority days
+        if is_schedule_shift_request(text):
+            return await self.generate_schedule_shift_proposal(user_id, db)
+
+        # 3. Normal conversational reasoning and tool execution via Gemini
         now = datetime.now().astimezone()
         now_str = now.strftime("%A, %B %d, %Y at %I:%M %p")
 

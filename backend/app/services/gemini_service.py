@@ -19,6 +19,7 @@ from app.services.prompt_builder import (
     build_minimal_profile_context,
     build_morning_briefing_prompt,
     build_opportunity_analysis_prompt,
+    build_orchestrated_reasoning_prompt,
     build_sop_generation_prompt,
     build_study_plan_prompt,
 )
@@ -165,3 +166,18 @@ class GeminiService:
         )
         return validate_structured_output(raw_json, SOPGenerateResult)
 
+    async def reason_orchestrated(self, prompt: str) -> "OrchestratedDecision":
+        """
+        Execute a single holistic Gemini reasoning call across all agent contexts.
+        Returns an OrchestratedDecision with the cross-agent action plan.
+        """
+        from app.schemas.orchestration_schemas import OrchestratedDecision
+        raw_json = await self.client.generate_json(
+            prompt=prompt,
+            system_instruction=(
+                "You are the OpenClaw Multi-Agent Orchestrator. Reason holistically across all "
+                "agent contexts. Never act on a single agent's data alone. Return only valid JSON "
+                "strictly matching the OrchestratedDecision schema provided in the prompt."
+            ),
+        )
+        return validate_structured_output(raw_json, OrchestratedDecision)
