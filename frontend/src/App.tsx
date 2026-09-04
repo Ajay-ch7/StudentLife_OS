@@ -3,6 +3,8 @@ import { api, type Approval, type CalendarEvent, type ProfileResponse, type Task
 import Onboarding from './pages/Onboarding';
 import TasksPage from './pages/TasksPage';
 import CalendarPage from './pages/CalendarPage';
+import InboxModal from './components/InboxModal';
+import BriefingModal from './components/BriefingModal';
 
 type View = 'dashboard' | 'tasks' | 'calendar' | 'settings';
 type WorkspaceData = { profile: ProfileResponse; tasks: Task[]; calendar: CalendarEvent[]; approvals: Approval[] };
@@ -18,11 +20,17 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard');
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isBriefingOpen, setIsBriefingOpen] = useState(false);
 
-  useEffect(() => {
+  const refreshData = () => {
     Promise.all([api.getProfile(), api.getTasks(), api.getCalendar(), api.getApprovals()])
       .then(([profile, tasks, calendar, approvals]) => setData({ profile, tasks, calendar, approvals }))
       .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Unable to connect to the backend.'));
+  };
+
+  useEffect(() => {
+    refreshData();
   }, []);
 
   const profileName = data?.profile.user.full_name ?? 'Student';
@@ -34,7 +42,7 @@ export default function App() {
         <div className="sidebar-footer"><span className="status-dot" /> Local mode</div>
       </aside>
       <main className="app-shell">
-        <header className="topbar"><div><p className="eyebrow">{view === 'dashboard' ? 'Workspace overview' : view === 'tasks' ? 'Work queue' : view === 'calendar' ? 'Schedule' : 'Workspace settings'}</p><h1>{view === 'dashboard' ? `Good morning, ${profileName}` : view === 'tasks' ? 'Make progress visible' : view === 'calendar' ? 'Protect your focus' : 'Your workspace'}</h1></div><div className="date-chip">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</div></header>
+        <header className="topbar"><div><p className="eyebrow">{view === 'dashboard' ? 'Workspace overview' : view === 'tasks' ? 'Work queue' : view === 'calendar' ? 'Schedule' : 'Workspace settings'}</p><h1>{view === 'dashboard' ? `Good morning, ${profileName}` : view === 'tasks' ? 'Make progress visible' : view === 'calendar' ? 'Protect your focus' : 'Your workspace'}</h1></div><div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}><button className="btn btn-secondary" onClick={() => setIsBriefingOpen(true)}>🌅 Morning Briefing</button><button className="btn btn-secondary" onClick={() => setIsInboxOpen(true)}>✨ AI Extractor</button><div className="date-chip">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</div></div></header>
         {error && <div className="notice error" role="alert">Backend unavailable. Start FastAPI to load your local workspace.</div>}
         {!data && !error && <div className="notice">Connecting to your local workspace...</div>}
         {data?.profile.profile === null && <Onboarding profile={data.profile} onSaved={(profile) => setData({ ...data, profile })} />}
@@ -46,7 +54,10 @@ export default function App() {
           <div className="card"><div className="card-heading"><h2>Approvals</h2><span className="number">{data?.approvals.length ?? 0}</span></div>{data?.approvals.length ? <ul>{data.approvals.slice(0, 3).map((approval) => <li key={approval.id}><span>{approval.action_type}</span><time>{approval.status}</time></li>)}</ul> : <EmptyState message="Nothing waiting for approval." />}</div>
         </section></section>}
         {data && data.profile.profile !== null && view === 'settings' && <Onboarding profile={data.profile} onSaved={(profile) => setData((current) => current ? { ...current, profile } : current)} />}
+        <InboxModal isOpen={isInboxOpen} onClose={() => setIsInboxOpen(false)} onTasksUpdated={refreshData} />
+        <BriefingModal isOpen={isBriefingOpen} onClose={() => setIsBriefingOpen(false)} />
       </main>
     </div>
   );
 }
+

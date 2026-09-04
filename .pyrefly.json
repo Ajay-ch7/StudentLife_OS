@@ -1,0 +1,10 @@
+{
+  "venv": "venv",
+  "venvPath": ".",
+  "pythonPath": "venv/Scripts/python.exe",
+  "extraPaths": [
+    "backend",
+    "openclaw",
+    "."
+  ]
+}

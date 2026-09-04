@@ -22,15 +22,17 @@ class TelegramAdapter:
         chat_id: str | None = None,
     ) -> TelegramMessage:
         resolved_chat_id = chat_id or self.settings.telegram_chat_id
-        if not resolved_chat_id:
-            raise ValueError("A Telegram chat ID is required to send a message")
 
         if self.settings.telegram_mock_mode:
             return TelegramMessage(
-                chat_id=resolved_chat_id,
+                chat_id=resolved_chat_id or "mock_student_chat",
                 text=text,
                 mocked=True,
             )
+
+        if not resolved_chat_id:
+            raise ValueError("A Telegram chat ID is required to send a live message")
+
 
         if not self.settings.telegram_bot_token:
             raise ValueError("A Telegram bot token is required for live delivery")

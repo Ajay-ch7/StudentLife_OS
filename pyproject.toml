@@ -1,0 +1,36 @@
+[project]
+name = "student-life-os"
+version = "0.1.0"
+description = "Local-First Autonomous AI Assistant for Students"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.6",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.5.2",
+    "sqlalchemy>=2.0.35",
+    "python-dotenv>=1.0.1",
+    "httpx>=0.27.2",
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = "venv"
+extraPaths = ["backend", "openclaw", "."]
+include = ["backend", "openclaw", "tests"]
+pythonPlatform = "Windows"
+pythonVersion = "3.14"
+
+[tool.pyrefly]
+venv = "venv"
+venv_path = "venv"
+search_path = ["backend", "openclaw", "."]
+python_interpreter = "venv/Scripts/python.exe"
+
+[tool.pytest.ini_options]
+pythonpath = ["backend", "."]
+testpaths = ["tests"]
+asyncio_mode = "strict"
