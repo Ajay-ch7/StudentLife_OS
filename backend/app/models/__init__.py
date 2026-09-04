@@ -9,6 +9,7 @@ from app.models.course import Course
 from app.models.deadline import Deadline
 from app.models.dsa_problem import DSAProblem
 from app.models.dsa_progress import DSAProgress
+from app.models.email_message import EmailMessage
 from app.models.exam import Exam
 from app.models.opportunity import Opportunity
 from app.models.note import Note

@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
     telegram_mock_mode: bool = True
+    telegram_polling_enabled: bool = True
+    google_client_secrets_file: str = "credentials.json"
+    google_token_file: str = "data/google_token.json"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache
@@ -34,5 +37,6 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 
 def ensure_data_directories() -> None:
     """Create the local directories required by the application."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     SQLITE_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

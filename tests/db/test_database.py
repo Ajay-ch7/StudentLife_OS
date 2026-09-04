@@ -26,6 +26,7 @@ def test_schema_contains_phase_one_tables() -> None:
         "deadlines",
         "dsa_problems",
         "dsa_progress",
+        "email_messages",
         "exams",
         "opportunities",
         "notes",

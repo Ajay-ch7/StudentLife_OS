@@ -48,6 +48,10 @@ def main() -> int:
             "--app-dir",
             backend_path,
             "--reload",
+            "--reload-dir",
+            backend_path,
+            "--reload-dir",
+            str(ROOT_DIR / "openclaw"),
             "--host",
             "0.0.0.0",
             "--port",
@@ -56,6 +60,7 @@ def main() -> int:
         cwd=ROOT_DIR,
         env=environment,
     )
+
     frontend_process = subprocess.Popen(
         [npm_command, "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"],
         cwd=ROOT_DIR / "frontend",

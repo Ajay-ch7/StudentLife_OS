@@ -8,7 +8,7 @@ from app.db.database import get_db
 from app.models.application import Application
 from app.models.opportunity import Opportunity
 from app.models.student_profile import StudentProfile
-from app.schemas.opportunities import ApplicationCreate, OpportunityCreate
+from app.schemas.opportunities import ApplicationCreate, ApplicationResponse, OpportunityCreate, OpportunityResponse
 from app.services.approval_service import ApprovalService
 
 router = APIRouter(tags=["opportunities"])
@@ -18,12 +18,12 @@ def _skills(value: str | None) -> set[str]:
     return {skill.strip().lower() for skill in (value or "").split(",") if skill.strip()}
 
 
-@router.get("/opportunities")
+@router.get("/opportunities", response_model=list[OpportunityResponse])
 def list_opportunities(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> Any:
     return db.query(Opportunity).filter(Opportunity.user_id == user_id).order_by(Opportunity.match_score.desc().nullslast()).all()
 
 
-@router.post("/opportunities")
+@router.post("/opportunities", response_model=OpportunityResponse)
 def create_opportunity(payload: OpportunityCreate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> Any:
     profile = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
     required = {skill.strip() for skill in payload.required_skills if skill.strip()}
@@ -44,7 +44,7 @@ def opportunity_match(opportunity_id: int, user_id: int = Depends(get_current_us
     return {"opportunity_id": item.id, "match_score": item.match_score or 0, "matched_skills": matched, "skill_gaps": sorted(required - set(matched))}
 
 
-@router.get("/applications")
+@router.get("/applications", response_model=list[ApplicationResponse])
 def list_applications(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> Any:
     return db.query(Application).filter(Application.user_id == user_id).order_by(Application.created_at.desc()).all()
 

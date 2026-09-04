@@ -20,7 +20,9 @@ class GeminiClient:
     def __init__(self, settings: Settings | None = None, is_mock: bool | None = None) -> None:
         self.settings = settings or get_settings()
         self.is_mock = is_mock if is_mock is not None else (
-            self.settings.gemini_api_key in ("changeme", "", None) or getattr(self.settings, "app_env", "") == "test"
+            self.settings.gemini_api_key in ("changeme", "your_gemini_api_key_here", "", None)
+            or str(self.settings.gemini_api_key).startswith("your_gemini_api_key")
+            or getattr(self.settings, "app_env", "") == "test"
         )
         self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.settings.gemini_model}:generateContent"
 
@@ -205,7 +207,77 @@ class GeminiClient:
                 "reasoning": "Standard academic assignment email containing specific deadlines.",
             })
 
+        if "autonomous reasoning engine" in prompt_lower or "tasks_to_update" in prompt_lower:
+            # Check if email is an extension / update
+            is_update = "extension" in prompt_lower or "extended" in prompt_lower
+            if is_update:
+                return json.dumps({
+                    "priority": "high",
+                    "requires_action": True,
+                    "summary": "CS302 Assignment 2 Deadline Extension by 24 hours.",
+                    "reasoning": "The email contains a mandatory assignment deadline extension modifying the existing planned completion date.",
+                    "deadlines": [
+                        {
+                            "title": "CS302 Assignment 2 Extended Deadline",
+                            "due_at": "2026-09-16T23:59:00Z",
+                            "source_context": "Extended by 24 hours",
+                            "is_hard_deadline": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "tasks_to_create": [],
+                    "tasks_to_update": [
+                        {
+                            "existing_task_id": None,
+                            "matching_title_query": "Assignment 2",
+                            "new_title": "CS302 Assignment 2 (Extended)",
+                            "new_deadline": "2026-09-16T23:59:00Z",
+                            "new_priority": "high",
+                            "update_reason": "Deadline extended by 24 hours",
+                        }
+                    ],
+                    "events_to_create": [],
+                    "detected_conflicts": ["Detected potential conflict with existing evening study block"],
+                    "recommended_action": "update_deadline",
+                    "draft_response_needed": False,
+                    "draft_response": None,
+                })
+            else:
+                return json.dumps({
+                    "priority": "high",
+                    "requires_action": True,
+                    "summary": "New academic assignment submission announcement.",
+                    "reasoning": "The email contains a mandatory assignment deadline that must be tracked.",
+                    "deadlines": [
+                        {
+                            "title": "Assignment Submission Deadline",
+                            "due_at": "2026-09-15T23:59:00Z",
+                            "source_context": "Submit by Sept 15",
+                            "is_hard_deadline": True,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "tasks_to_create": [
+                        {
+                            "title": "Assignment Submission",
+                            "description": "Complete and submit homework via Canvas",
+                            "deadline": "2026-09-15T23:59:00Z",
+                            "priority": "high",
+                            "category": "assignment",
+                            "estimated_effort_hours": 3.0,
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "tasks_to_update": [],
+                    "events_to_create": [],
+                    "detected_conflicts": [],
+                    "recommended_action": "create_task",
+                    "draft_response_needed": False,
+                    "draft_response": None,
+                })
+
         # Generic default
+
         return json.dumps({
             "status": "ok",
             "message": "Processed successfully",

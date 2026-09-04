@@ -10,6 +10,7 @@ class User(BaseEntity):
 
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    telegram_name: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
 
     profile: Mapped["StudentProfile"] = relationship(back_populates="user")
 

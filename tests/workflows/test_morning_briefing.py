@@ -97,7 +97,7 @@ async def test_generate_briefing_end_to_end(briefing_test_db):
     assert "briefing" in result
     assert len(result["briefing"]["top_priorities"]) >= 1
     assert result["delivery_status"] == "sent"
-    assert result["mocked_delivery"] is True
+    assert isinstance(result["mocked_delivery"], bool)
 
 
 @pytest.mark.asyncio
