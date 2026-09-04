@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type Approval, type CalendarEvent, type ProfileResponse, type Task } from './api/client';
 import Onboarding from './pages/Onboarding';
+import TasksPage from './pages/TasksPage';
+import CalendarPage from './pages/CalendarPage';
 
-type View = 'dashboard' | 'settings';
+type View = 'dashboard' | 'tasks' | 'calendar' | 'settings';
 type WorkspaceData = { profile: ProfileResponse; tasks: Task[]; calendar: CalendarEvent[]; approvals: Approval[] };
 
 function formatDate(value: string | null) {
@@ -28,14 +30,16 @@ export default function App() {
     <div className="app-frame">
       <aside className="sidebar">
         <div className="brand-mark">SL</div><div className="brand-copy"><strong>Student Life</strong><span>OS / local workspace</span></div>
-        <nav aria-label="Primary navigation"><button className={view === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dashboard')}>Dashboard</button><button className={view === 'settings' ? 'nav-link active' : 'nav-link'} onClick={() => setView('settings')}>Settings</button></nav>
+        <nav aria-label="Primary navigation"><button className={view === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dashboard')}>Dashboard</button><button className={view === 'tasks' ? 'nav-link active' : 'nav-link'} onClick={() => setView('tasks')}>Tasks</button><button className={view === 'calendar' ? 'nav-link active' : 'nav-link'} onClick={() => setView('calendar')}>Calendar</button><button className={view === 'settings' ? 'nav-link active' : 'nav-link'} onClick={() => setView('settings')}>Settings</button></nav>
         <div className="sidebar-footer"><span className="status-dot" /> Local mode</div>
       </aside>
       <main className="app-shell">
-        <header className="topbar"><div><p className="eyebrow">{view === 'dashboard' ? 'Workspace overview' : 'Workspace settings'}</p><h1>{view === 'dashboard' ? `Good morning, ${profileName}` : 'Your workspace'}</h1></div><div className="date-chip">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</div></header>
+        <header className="topbar"><div><p className="eyebrow">{view === 'dashboard' ? 'Workspace overview' : view === 'tasks' ? 'Work queue' : view === 'calendar' ? 'Schedule' : 'Workspace settings'}</p><h1>{view === 'dashboard' ? `Good morning, ${profileName}` : view === 'tasks' ? 'Make progress visible' : view === 'calendar' ? 'Protect your focus' : 'Your workspace'}</h1></div><div className="date-chip">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</div></header>
         {error && <div className="notice error" role="alert">Backend unavailable. Start FastAPI to load your local workspace.</div>}
         {!data && !error && <div className="notice">Connecting to your local workspace...</div>}
         {data?.profile.profile === null && <Onboarding profile={data.profile} onSaved={(profile) => setData({ ...data, profile })} />}
+        {data && data.profile.profile !== null && view === 'tasks' && <TasksPage tasks={data.tasks} onChanged={(tasks) => setData({ ...data, tasks })} />}
+        {data && data.profile.profile !== null && view === 'calendar' && <CalendarPage events={data.calendar} onChanged={(calendar) => setData({ ...data, calendar })} />}
         {data?.profile.profile !== null && view === 'dashboard' && <section className="dashboard-content"><div className="section-heading"><div><p className="eyebrow">At a glance</p><h2>Today&apos;s rhythm</h2></div><span className="muted">{data?.tasks.length ?? 0} active tasks</span></div><section className="grid">
           <div className="card feature-card"><div className="card-heading"><h2>Tasks</h2><span className="number">{data?.tasks.length ?? 0}</span></div>{data?.tasks.length ? <ul>{data.tasks.slice(0, 4).map((task) => <li key={task.id}><span>{task.title}</span><time>{formatDate(task.deadline)}</time></li>)}</ul> : <EmptyState message="Your task list is clear." />}</div>
           <div className="card"><div className="card-heading"><h2>Next on the calendar</h2><span className="number">{data?.calendar.length ?? 0}</span></div>{data?.calendar.length ? <ul>{data.calendar.slice(0, 3).map((event) => <li key={event.id}><span>{event.title}</span><time>{formatDate(event.starts_at)}</time></li>)}</ul> : <EmptyState message="No events scheduled yet." />}</div>

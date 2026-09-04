@@ -6,8 +6,10 @@ export type ProfileResponse = {
 };
 export type ProfileInput = Omit<NonNullable<ProfileResponse['profile']>, 'id'> & { full_name?: string };
 
-export type Task = { id: number; title: string; deadline: string | null; status: string; priority: string };
-export type CalendarEvent = { id: number; title: string; starts_at: string; ends_at: string; event_type: string };
+export type Task = { id: number; user_id: number; title: string; description: string | null; deadline: string | null; status: string; priority: string; category: string | null; estimated_effort_hours: number | null; source: string | null; is_confirmed_deadline: boolean; is_overdue: boolean };
+export type CalendarEvent = { id: number; user_id: number; task_id: number | null; title: string; description: string | null; starts_at: string; ends_at: string; event_type: string; location: string | null };
+export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'user_id'>;
+export type Conflict = { has_conflict: boolean; reasons: string[] };
 export type Approval = { id: number; action_type: string; description: string; status: string };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -20,6 +22,11 @@ export const api = {
   getProfile: () => request<ProfileResponse>('/profile'),
   saveProfile: (profile: ProfileInput, id?: number) => request<ProfileResponse>(id ? `/profile/${id}` : '/profile', { method: id ? 'PUT' : 'POST', body: JSON.stringify(profile) }),
   getTasks: () => request<Task[]>('/tasks'),
+  createTask: (task: Omit<Task, 'id' | 'user_id' | 'is_overdue'>) => request<Task>('/tasks', { method: 'POST', body: JSON.stringify(task) }),
+  updateTask: (id: number, task: Partial<Omit<Task, 'id' | 'user_id' | 'is_overdue'>>) => request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(task) }),
+  deleteTask: (id: number) => request<void>(`/tasks/${id}`, { method: 'DELETE' }),
   getCalendar: () => request<CalendarEvent[]>('/calendar'),
+  checkCalendarConflicts: (event: CalendarEventInput) => request<Conflict>('/calendar/conflicts', { method: 'POST', body: JSON.stringify(event) }),
+  createCalendarEvent: (event: CalendarEventInput) => request<CalendarEvent>('/calendar/events', { method: 'POST', body: JSON.stringify(event) }),
   getApprovals: () => request<Approval[]>('/approvals'),
 };

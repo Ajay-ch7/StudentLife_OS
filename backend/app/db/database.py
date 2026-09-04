@@ -29,6 +29,9 @@ def init_db() -> None:
 			for column, column_type in _profile_columns.items():
 				if column not in existing:
 					connection.execute(text(f"ALTER TABLE student_profiles ADD COLUMN {column} {column_type}"))
+			event_columns = {column["name"] for column in inspect(connection).get_columns("calendar_events")}
+			if "task_id" not in event_columns:
+				connection.execute(text("ALTER TABLE calendar_events ADD COLUMN task_id INTEGER"))
 
 
 def get_db() -> Generator:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import profile, resources
+from app.api.v1 import calendar, profile, resources, tasks
 from app.core.config import ensure_data_directories
 from app.core.exceptions import unhandled_exception_handler
 from app.core.logging import configure_logging
@@ -23,6 +23,8 @@ app.add_middleware(
 )
 
 app.include_router(profile.router, prefix="/api/v1")
+app.include_router(tasks.router, prefix="/api/v1")
+app.include_router(calendar.router, prefix="/api/v1")
 app.include_router(resources.router, prefix="/api/v1")
 
 
