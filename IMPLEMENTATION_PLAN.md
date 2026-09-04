@@ -47,7 +47,7 @@ This order matters because deterministic data, validation, and scheduling logic 
   - workflow registration
 
 - Integrations and testing lead
-  - mock adapters for email/WhatsApp/calendar
+  - mock adapters for email/Telegram/calendar
   - security and prompt-injection checks
   - tests and local workflow validation
   - documentation and demo preparation
@@ -131,7 +131,7 @@ graph TD
 
 - document parsing and chunking
 - study-plan generation
-- notifications and mock WhatsApp adapter
+- notifications and mock Telegram adapter
 - audit history and workflow logs
 - custom filters and sorting
 - missed-session recovery
@@ -171,7 +171,7 @@ The rest of the project depends on having a reliable local environment, common c
 - backend with FastAPI
 - Python environment
 - Node environment
-- Docker Compose or equivalent local startup
+- local Python and npm startup
 - `.env.example`
 - `.gitignore`
 - configuration management
@@ -185,7 +185,7 @@ The rest of the project depends on having a reliable local environment, common c
 - `backend/app/main.py`
 - `backend/app/core/config.py`
 - `backend/app/core/logging.py`
-- `docker-compose.yml`
+- `start.py`
 - `.env.example`
 - `.gitignore`
 
@@ -701,7 +701,7 @@ The agent must never write to SQLite directly; it should call backend tools that
 - generate_study_plan()
 - parse_document()
 - search_student_knowledge()
-- send_whatsapp_message()
+- send_telegram_message()
 - create_approval_request()
 
 ### Files or modules to create/update
@@ -882,13 +882,13 @@ It builds on the same extraction and validation model while adding calendar, dea
 - retrieve local tasks, deadlines, calendar events, applications, opportunities, and study sessions
 - minimal-context prompt to Gemini
 - briefing generation and validation
-- WhatsApp or mock notification
+- Telegram or mock notification
 - audit log
 
 ### Files or modules to create/update
 - `backend/app/workflows/morning_briefing.py`
 - `backend/app/services/briefing_service.py`
-- `backend/app/integrations/whatsapp_adapter.py`
+- `backend/app/integrations/telegram_adapter.py`
 - `frontend/src/pages/BriefingPage.tsx`
 
 ### API endpoints
@@ -923,7 +923,7 @@ A morning briefing can be generated locally, reviewed, and sent via mock or exte
 - schedule claims not grounded in real availability
 
 ### Fallback or mock implementation
-- use mock WhatsApp provider for demo and local dev
+- use mock Telegram provider for demo and local dev
 
 ---
 
@@ -1083,7 +1083,7 @@ Career features depend on profile data, skills, availability, and target roles.
 8. skill-gap analysis
 9. application tracking
 10. opportunity ranking
-11. WhatsApp opportunity updates
+11. Telegram opportunity updates
 
 ### Files or modules to create/update
 - `backend/app/models/opportunity.py`
@@ -1207,7 +1207,7 @@ It depends on real scheduling rules and approval constraints.
 - end-of-day review
 - automatic rescheduling proposal
 - approval for significant schedule changes
-- WhatsApp or mock notification
+- Telegram or mock notification
 
 ### Files or modules to create/update
 - `backend/app/services/focus_service.py`
@@ -1450,7 +1450,7 @@ The project should be documented after the architecture and feature set are stab
 - `README.md`
 - `IMPLEMENTATION_PLAN.md`
 - `.env.example`
-- Docker Compose configuration
+- local startup launcher
 - Local setup instructions
 - Integration setup instructions
 - Database backup instructions
@@ -1461,7 +1461,7 @@ The project should be documented after the architecture and feature set are stab
 
 ### Files or modules to create/update
 - root-level markdown docs
-- `docker-compose.yml`
+- `start.py`
 - `.env.example`
 - `.gitignore`
 
@@ -1583,7 +1583,7 @@ The demo story is reliable, concise, and demonstrates the architectural principl
 
 ### Demo readiness
 - [ ] one-click local startup works
-- [ ] mock WhatsApp adapter is clearly labeled
+- [ ] mock Telegram adapter is clearly labeled
 - [ ] a realistic demo profile exists
 - [ ] single user flow is stable and repeatable
 - [ ] all key actions are visible in the UI and activity log

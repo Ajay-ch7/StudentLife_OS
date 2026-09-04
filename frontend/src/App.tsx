@@ -1,40 +1,48 @@
+import { useEffect, useState } from 'react';
+import { api, type Approval, type CalendarEvent, type ProfileResponse, type Task } from './api/client';
+import Onboarding from './pages/Onboarding';
+
+type View = 'dashboard' | 'settings';
+type WorkspaceData = { profile: ProfileResponse; tasks: Task[]; calendar: CalendarEvent[]; approvals: Approval[] };
+
+function formatDate(value: string | null) {
+  if (!value) return 'No deadline';
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(value));
+}
+
+function EmptyState({ message }: { message: string }) { return <p className="empty-state">{message}</p>; }
+
 export default function App() {
+  const [view, setView] = useState<View>('dashboard');
+  const [data, setData] = useState<WorkspaceData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.getProfile(), api.getTasks(), api.getCalendar(), api.getApprovals()])
+      .then(([profile, tasks, calendar, approvals]) => setData({ profile, tasks, calendar, approvals }))
+      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Unable to connect to the backend.'));
+  }, []);
+
+  const profileName = data?.profile.user.full_name ?? 'Student';
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Student Life OS</p>
-          <h1>Local-first student productivity dashboard</h1>
-        </div>
-      </header>
-
-      <section className="grid">
-        <div className="card">
-          <h2>Today</h2>
-          <ul>
-            <li>DBMS assignment due tomorrow</li>
-            <li>Project meeting at 5:00 PM</li>
-            <li>DSA revision block scheduled</li>
-          </ul>
-        </div>
-
-        <div className="card">
-          <h2>Opportunities</h2>
-          <ul>
-            <li>Salesforce internship match: 86%</li>
-            <li>Skill gap: data structures + SQL</li>
-          </ul>
-        </div>
-
-        <div className="card">
-          <h2>Study plan</h2>
-          <ul>
-            <li>ML revision: 45 min</li>
-            <li>DBMS practice: 60 min</li>
-            <li>System design review: 30 min</li>
-          </ul>
-        </div>
-      </section>
-    </main>
+    <div className="app-frame">
+      <aside className="sidebar">
+        <div className="brand-mark">SL</div><div className="brand-copy"><strong>Student Life</strong><span>OS / local workspace</span></div>
+        <nav aria-label="Primary navigation"><button className={view === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dashboard')}>Dashboard</button><button className={view === 'settings' ? 'nav-link active' : 'nav-link'} onClick={() => setView('settings')}>Settings</button></nav>
+        <div className="sidebar-footer"><span className="status-dot" /> Local mode</div>
+      </aside>
+      <main className="app-shell">
+        <header className="topbar"><div><p className="eyebrow">{view === 'dashboard' ? 'Workspace overview' : 'Workspace settings'}</p><h1>{view === 'dashboard' ? `Good morning, ${profileName}` : 'Your workspace'}</h1></div><div className="date-chip">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</div></header>
+        {error && <div className="notice error" role="alert">Backend unavailable. Start FastAPI to load your local workspace.</div>}
+        {!data && !error && <div className="notice">Connecting to your local workspace...</div>}
+        {data?.profile.profile === null && <Onboarding profile={data.profile} onSaved={(profile) => setData({ ...data, profile })} />}
+        {data?.profile.profile !== null && view === 'dashboard' && <section className="dashboard-content"><div className="section-heading"><div><p className="eyebrow">At a glance</p><h2>Today&apos;s rhythm</h2></div><span className="muted">{data?.tasks.length ?? 0} active tasks</span></div><section className="grid">
+          <div className="card feature-card"><div className="card-heading"><h2>Tasks</h2><span className="number">{data?.tasks.length ?? 0}</span></div>{data?.tasks.length ? <ul>{data.tasks.slice(0, 4).map((task) => <li key={task.id}><span>{task.title}</span><time>{formatDate(task.deadline)}</time></li>)}</ul> : <EmptyState message="Your task list is clear." />}</div>
+          <div className="card"><div className="card-heading"><h2>Next on the calendar</h2><span className="number">{data?.calendar.length ?? 0}</span></div>{data?.calendar.length ? <ul>{data.calendar.slice(0, 3).map((event) => <li key={event.id}><span>{event.title}</span><time>{formatDate(event.starts_at)}</time></li>)}</ul> : <EmptyState message="No events scheduled yet." />}</div>
+          <div className="card"><div className="card-heading"><h2>Approvals</h2><span className="number">{data?.approvals.length ?? 0}</span></div>{data?.approvals.length ? <ul>{data.approvals.slice(0, 3).map((approval) => <li key={approval.id}><span>{approval.action_type}</span><time>{approval.status}</time></li>)}</ul> : <EmptyState message="Nothing waiting for approval." />}</div>
+        </section></section>}
+        {data && data.profile.profile !== null && view === 'settings' && <Onboarding profile={data.profile} onSaved={(profile) => setData((current) => current ? { ...current, profile } : current)} />}
+      </main>
+    </div>
   );
 }

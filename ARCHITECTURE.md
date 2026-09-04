@@ -11,7 +11,7 @@ The system is intentionally simple for an MVP:
 - SQLite stores the student’s core data locally.
 - Gemini is used for natural-language reasoning, extraction, prioritization, and synthesis.
 - A local React/Vite website acts as the control plane and dashboard.
-- External integrations (WhatsApp, email, calendar, opportunities) are adapters that are isolated behind backend services.
+- External integrations (Telegram, email, calendar, opportunities) are adapters that are isolated behind backend services.
 
 The key architectural principle is simple: the LLM never directly reads or writes SQLite. All interactions with data happen through backend tools that enforce validation, permission checks, and audit logging.
 
@@ -26,7 +26,7 @@ Student Life OS is designed for a single student laptop or desktop environment.
 - Local data ownership: profile, tasks, courses, documents, deadlines, applications, and history are stored in SQLite.
 - Minimal external transmission: only the minimum required context is sent to Gemini.
 - Deterministic enforcement: business rules, validation, permissions, scheduling constraints, and approvals are implemented in Python/FastAPI before agent action.
-- External content is untrusted: emails, PDFs, job descriptions, WhatsApp messages, and web pages are treated as data sources, not instructions.
+- External content is untrusted: emails, PDFs, job descriptions, Telegram messages, and web pages are treated as data sources, not instructions.
 - Human approval for consequential actions: important emails, applications, calendar changes, purchases, and deletions require explicit approval.
 
 ### Primary runtime topology
@@ -154,7 +154,7 @@ The tool layer is the critical security boundary. Instead of allowing the agent 
 - generate_study_plan()
 - parse_document()
 - search_student_knowledge()
-- send_whatsapp_message()
+- send_telegram_message()
 - create_approval_request()
 
 ### Tool contract
@@ -195,7 +195,7 @@ The system processes data in a controlled path with explicit trust boundaries.
 
 ```mermaid
 flowchart LR
-    A[Email / WhatsApp / PDF / Job posting / Calendar source] --> B[External adapter]
+    A[Email / Telegram / PDF / Job posting / Calendar source] --> B[External adapter]
     B --> C[Untrusted content boundary]
     C --> D[Extraction and normalization]
     D --> E[Gemini structured reasoning]
@@ -381,7 +381,7 @@ External integrations are outside the core local database and are intentionally 
 
 ### Messaging and communication
 
-- WhatsApp: mock provider or adapter for local development; production adapter behind a clear permission boundary.
+- Telegram: mock provider or adapter for local development; production adapter behind a clear permission boundary.
 - Email: inbound message ingestion and outbound communication adapter.
 
 ### Calendar and scheduling
@@ -609,7 +609,7 @@ The system should run locally on the student’s computer, with minimal infrastr
 - SQLite database
 - OpenClaw runtime
 - Gemini API access
-- Optional mock adapters for WhatsApp and notifications
+- Optional mock adapters for Telegram and notifications
 
 ```mermaid
 flowchart TB
@@ -623,7 +623,7 @@ flowchart TB
     end
 
     G[Gemini API]
-    H[Email/WhatsApp/Calendar/Opportunity sources]
+    H[Email/Telegram/Calendar/Opportunity sources]
 
     A --> B
     B --> C
@@ -637,16 +637,10 @@ flowchart TB
 
 ### Recommended local deployment commands
 
-```bash
-docker compose up
-```
-
-Or equivalent local startup:
+Start the local stack with the repository launcher:
 
 ```bash
-npm install
-cd frontend && npm run dev
-cd backend && uvicorn app.main:app --reload
+python start.py
 ```
 
 ---
@@ -659,7 +653,7 @@ cd backend && uvicorn app.main:app --reload
 - SQLite-backed student profile
 - Task and deadline extraction
 - Calendar conflict detection
-- Morning WhatsApp briefing
+- Morning Telegram briefing
 - Study planning
 - Opportunity analysis
 - Skill-gap analysis
@@ -688,7 +682,7 @@ flowchart TD
     D --> E[Gemini generates briefing]
     E --> F[Backend validates schedule claims]
     F --> G{Approval needed?}
-    G -->|No| H[Send WhatsApp/mock briefing]
+    G -->|No| H[Send Telegram/mock briefing]
     G -->|Yes| I[Create approval request]
     I --> J[User approval]
     J --> H

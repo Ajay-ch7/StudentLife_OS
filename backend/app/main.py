@@ -1,7 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import profile, resources
+from app.core.config import ensure_data_directories
+from app.core.exceptions import unhandled_exception_handler
+from app.core.logging import configure_logging
+from app.db.database import init_db
+
+configure_logging()
+ensure_data_directories()
+init_db()
+
 app = FastAPI(title="Student Life OS API", version="0.1.0")
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -10,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(profile.router, prefix="/api/v1")
+app.include_router(resources.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

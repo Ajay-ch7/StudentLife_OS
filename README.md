@@ -114,7 +114,7 @@ flowchart LR
 - OpenClaw for local agent orchestration
 - Gemini API for reasoning and extraction
 - Python for backend services and workflow orchestration
-- Docker Compose for local stack startup
+- Python and npm for local stack startup
 
 ---
 
@@ -210,7 +210,7 @@ These are never trusted as instructions and must be validated before use.
 - retrieve opportunities and DSA priorities
 - ask Gemini for a concise briefing
 - validate schedule claims and deadlines
-- send notification through WhatsApp or a mock adapter
+- send notification through Telegram or a mock adapter
 
 ### Opportunity analysis workflow
 
@@ -237,7 +237,7 @@ student-life-os/
 │   ├── tools/
 │   ├── workflows/
 │   ├── app/
-│   └── requirements.txt
+│   └── app/
 ├── openclaw/
 │   ├── agent/
 │   ├── workflows/
@@ -254,7 +254,8 @@ student-life-os/
 ├── README.md
 ├── IMPLEMENTATION_PLAN.md
 ├── .env.example
-├── docker-compose.yml
+├── requirements.txt
+├── start.py
 ├── .gitignore
 └── Makefile
 ```
@@ -268,7 +269,6 @@ student-life-os/
 - Python 3.11+
 - Node.js 18+
 - npm or pnpm
-- Docker Compose (optional but recommended for local stack)
 - Gemini API key
 
 ### Clone and install
@@ -280,7 +280,7 @@ cd student-life-os
 # Python deps
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 
 # Frontend deps
 cd frontend
@@ -299,7 +299,9 @@ GEMINI_MODEL=gemini-1.5-flash
 APP_ENV=development
 DATABASE_URL=sqlite:///./data/sqlite/student_life_os.db
 UPLOAD_DIR=./data/uploads
-WHATSAPP_MOCK_MODE=true
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_MOCK_MODE=true
 LOG_LEVEL=INFO
 ```
 
@@ -313,24 +315,20 @@ Important:
 
 ## Local Development
 
-### Start backend
+### Start the local stack
 
 ```bash
-cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python start.py
 ```
 
-### Start frontend
+The website is available at `http://localhost:5173` and the API at
+`http://localhost:8000`. Stop both processes with `Ctrl+C`.
+
+To run either process separately:
 
 ```bash
-cd frontend
-npm run dev
-```
-
-### Start local stack
-
-```bash
-docker compose up
+python -m uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 8000
+npm --prefix frontend run dev
 ```
 
 ### Run tests
@@ -348,7 +346,6 @@ The default deployment target is the student’s local machine. The stack is int
 Recommended local run modes:
 
 - local Python backend + frontend dev server
-- Docker Compose for the full stack in a consistent environment
 - local SQLite file in `data/sqlite/`
 
 The database and uploaded documents should remain local and excluded from git.
@@ -418,7 +415,7 @@ A strong demo should show the full loop:
 7. It proposes a revised schedule.
 8. The student approves it.
 9. The calendar updates.
-10. The morning briefing is sent via WhatsApp mock adapter.
+10. The morning briefing is sent via the Telegram mock adapter.
 11. A new internship is analyzed for fit and skill gaps.
 
 This demo highlights the flow:

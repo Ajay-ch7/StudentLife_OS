@@ -26,5 +26,10 @@ class StudentProfile(Base):
     cgpa: Mapped[float | None] = mapped_column(nullable=True)
     target_roles: Mapped[str | None] = mapped_column(String(500), nullable=True)
     target_companies: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    skills: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    preferred_locations: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    available_study_hours: Mapped[float | None] = mapped_column(nullable=True)
+    preferred_study_times: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    notification_preferences: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="profile")

@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     upload_dir: str = "./data/uploads"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_mock_mode: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -23,7 +26,13 @@ def get_settings() -> Settings:
     return Settings()
 
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[3]
 DATA_DIR = BASE_DIR / "data"
 SQLITE_DIR = DATA_DIR / "sqlite"
 UPLOAD_DIR = DATA_DIR / "uploads"
+
+
+def ensure_data_directories() -> None:
+    """Create the local directories required by the application."""
+    SQLITE_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
