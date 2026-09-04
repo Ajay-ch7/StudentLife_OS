@@ -26,17 +26,19 @@ class StudentLifeAgent:
         self.tools = tool_bridge or OpenClawToolBridge()
 
     async def get_student_context(self, user_id: int, db: Session) -> dict[str, Any]:
-        """Fetch current minimal workspace context needed for reasoning."""
+        """Fetch current workspace context needed for reasoning."""
         profile_resp = await self.tools.invoke_tool("get_student_profile", {}, user_id, db)
         tasks_resp = await self.tools.invoke_tool("get_tasks", {"status": "pending"}, user_id, db)
         cal_resp = await self.tools.invoke_tool("get_calendar", {}, user_id, db)
         deadlines_resp = await self.tools.invoke_tool("get_deadlines", {"upcoming_only": True}, user_id, db)
+        opps_resp = await self.tools.invoke_tool("search_opportunities", {"query": ""}, user_id, db)
 
         return {
             "profile": profile_resp.result if profile_resp.status == "success" else {},
             "tasks": tasks_resp.result if tasks_resp.status == "success" else [],
             "calendar": cal_resp.result if cal_resp.status == "success" else [],
             "deadlines": deadlines_resp.result if deadlines_resp.status == "success" else [],
+            "opportunities": opps_resp.result if opps_resp.status == "success" else [],
         }
 
     async def run_tool(

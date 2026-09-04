@@ -1,17 +1,52 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, focus, inbox, opportunities, profile, resources, tasks, tools
-from app.core.config import ensure_data_directories
+from app.core.config import ensure_data_directories, get_settings
 from app.core.exceptions import unhandled_exception_handler
 from app.core.logging import configure_logging
 from app.db.database import init_db
+from app.services.realtime_sync_service import realtime_sync_service
+from app.services.telegram_bot_listener import telegram_bot_listener
 
 configure_logging()
 ensure_data_directories()
 init_db()
 
-app = FastAPI(title="Student Life OS API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    polling_task = None
+    sync_task = None
+    if settings.telegram_polling_enabled and not settings.telegram_mock_mode and settings.telegram_bot_token:
+        polling_task = asyncio.create_task(telegram_bot_listener.start_polling())
+    
+    # Start continuous background Gmail & Calendar real-time sync
+    sync_task = asyncio.create_task(realtime_sync_service.start_periodic_sync())
+
+    yield
+
+    if polling_task:
+        telegram_bot_listener.stop()
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
+
+    if sync_task:
+        realtime_sync_service.stop()
+        sync_task.cancel()
+        try:
+            await sync_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Student Life OS API", version="0.1.0", lifespan=lifespan)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.add_middleware(

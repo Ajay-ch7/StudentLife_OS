@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 from app.integrations.gemini_client import GeminiClient
+from app.schemas.email_workflow_schemas import EmailReasoningDecision
 from app.schemas.gemini_schemas import (
     ContentClassificationResult,
     MorningBriefingResult,
@@ -11,6 +12,7 @@ from app.schemas.gemini_schemas import (
 )
 from app.services.prompt_builder import (
     build_content_classification_prompt,
+    build_email_action_reasoning_prompt,
     build_extraction_prompt,
     build_minimal_profile_context,
     build_morning_briefing_prompt,
@@ -18,6 +20,7 @@ from app.services.prompt_builder import (
     build_study_plan_prompt,
 )
 from app.services.schema_validation import validate_structured_output
+
 
 logger = logging.getLogger(__name__)
 
@@ -97,3 +100,28 @@ class GeminiService:
             system_instruction="You are a security and classification filter. Return only valid JSON classifications.",
         )
         return validate_structured_output(raw_json, ContentClassificationResult)
+
+    async def reason_over_email(
+        self,
+        email_data: dict[str, Any],
+        profile: Any = None,
+        active_tasks: list[dict[str, Any]] | None = None,
+        calendar_events: list[dict[str, Any]] | None = None,
+    ) -> EmailReasoningDecision:
+        """
+        Execute comprehensive structured reasoning over incoming email content,
+        evaluating urgency, updates to existing tasks, calendar events, conflicts, and actions.
+        """
+        profile_context = build_minimal_profile_context(profile)
+        prompt = build_email_action_reasoning_prompt(
+            email_data=email_data,
+            profile_context=profile_context,
+            active_tasks=active_tasks or [],
+            calendar_events=calendar_events or [],
+        )
+        raw_json = await self.client.generate_json(
+            prompt=prompt,
+            system_instruction="You are OpenClaw's autonomous reasoning engine for StudentLife OS. Return only valid JSON matching the requested schema.",
+        )
+        return validate_structured_output(raw_json, EmailReasoningDecision)
+

@@ -62,3 +62,28 @@ async def preview_inbox_extraction(
         dry_run=True,
     )
     return InboxProcessResponse(**result)
+
+
+class EmailItemResponse(BaseModel):
+    id: int
+    user_id: int
+    gmail_id: str
+    sender: str
+    subject: str
+    snippet: str | None = None
+    category: str = "general"
+    has_tasks_extracted: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/emails", response_model=list[EmailItemResponse])
+def list_saved_emails(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> list[EmailItemResponse]:
+    """Retrieve all synchronized Gmail emails saved in the SQLite database."""
+    from app.models.email_message import EmailMessage
+    return db.query(EmailMessage).filter(EmailMessage.user_id == user_id).order_by(EmailMessage.id.desc()).all()
+

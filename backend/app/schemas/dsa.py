@@ -11,5 +11,13 @@ class DSAProblemCreate(BaseModel):
     needs_revision: bool = False
 
 
+class DSAProblemResponse(DSAProblemCreate):
+    id: int
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+
 class DSAImport(BaseModel):
     problems: list[DSAProblemCreate] = Field(..., min_length=1, max_length=500)

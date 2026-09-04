@@ -195,3 +195,108 @@ Return a JSON object matching the following structure:
   "contains_actionable_items": true | false,
   "reasoning": "Brief explanation of classification"
 }}"""
+
+
+def build_email_action_reasoning_prompt(
+    email_data: dict[str, Any],
+    profile_context: dict[str, Any],
+    active_tasks: list[dict[str, Any]],
+    calendar_events: list[dict[str, Any]],
+) -> str:
+    """
+    Build a comprehensive reasoning prompt for OpenClaw / Featherless AI to analyze an incoming email.
+    Evaluates urgency, deadlines, updates to existing tasks vs new tasks, calendar events,
+    conflicts, recommended actions, and transparent reasoning.
+    """
+    safe_subject = redact_sensitive_data(str(email_data.get("subject", "")))
+    safe_sender = redact_sensitive_data(str(email_data.get("sender", "")))
+    safe_body = redact_sensitive_data(str(email_data.get("body", "")))
+    timestamp = email_data.get("timestamp", "")
+
+    return f"""You are the OpenClaw Autonomous Reasoning Engine for StudentLife OS.
+Analyze the following newly received email against the student's current workspace state.
+
+STUDENT PROFILE:
+{profile_context}
+
+CURRENT ACTIVE TASKS IN DATABASE:
+{active_tasks}
+
+UPCOMING CALENDAR COMMITMENTS:
+{calendar_events}
+
+EMAIL METADATA:
+From: {safe_sender}
+Subject: {safe_subject}
+Date: {timestamp}
+
+<untrusted_email_body>
+{safe_body}
+</untrusted_email_body>
+
+REASONING INSTRUCTIONS:
+1. Priority: Classify as "low", "medium", "high", or "urgent" based on urgency and academic/career impact.
+2. Action Required: Determine if this email requires action (e.g., submitting an assignment, attending a meeting, registering, replying).
+3. Deadlines & Dates: Extract all explicit cutoffs, due dates, or meeting timestamps.
+4. Smart Task Handling:
+   - Check CURRENT ACTIVE TASKS above. If the email is an update, extension, or modification for an existing task (e.g., "Assignment 2 Deadline Extension" where "Assignment 2" is already tracked), put it in "tasks_to_update" instead of duplicating it in "tasks_to_create".
+   - If it's a completely new assignment or deliverable, put it in "tasks_to_create".
+5. Events & Schedule: If the email announces a class, review session, meeting, or interview at a specific date/time, include it in "events_to_create".
+6. Conflict Detection: Compare any new deadlines or proposed event times against the UPCOMING CALENDAR COMMITMENTS. If there is a scheduling conflict, clearly document it in "detected_conflicts".
+7. Recommended Action: Recommend one of "create_task", "update_deadline", "schedule_event", "draft_reply", or "no_action_needed".
+8. Email Draft: If the email explicitly requires a student reply (e.g. asking for confirmation or project choice), set "draft_response_needed": true and draft a polite, professional reply in "draft_response".
+9. Transparent Reasoning: Provide a short, crystal-clear explanation for why this priority was assigned and what changes were recommended.
+
+Return a JSON object matching the following structure STRICTLY:
+{{
+  "priority": "low" | "medium" | "high" | "urgent",
+  "requires_action": true | false,
+  "summary": "1-sentence summary of the email",
+  "reasoning": "Clear explanation of why this priority was assigned and why changes were made",
+  "deadlines": [
+    {{
+      "title": "Short title of deadline",
+      "due_at": "ISO-8601 datetime string",
+      "source_context": "Snippet indicating this deadline",
+      "is_hard_deadline": true,
+      "confidence": 0.95
+    }}
+  ],
+  "tasks_to_create": [
+    {{
+      "title": "Task title",
+      "description": "Details or specific requirements",
+      "deadline": "ISO-8601 datetime string or null",
+      "priority": "low" | "medium" | "high" | "urgent",
+      "category": "assignment" | "exam" | "project" | "career" | "admin" | "dsa",
+      "estimated_effort_hours": 2.0,
+      "confidence": 0.95
+    }}
+  ],
+  "tasks_to_update": [
+    {{
+      "existing_task_id": null,
+      "matching_title_query": "Assignment 2",
+      "new_title": null,
+      "new_deadline": "ISO-8601 datetime string or null",
+      "new_priority": "high",
+      "update_reason": "Professor extended deadline by 24 hours"
+    }}
+  ],
+  "events_to_create": [
+    {{
+      "title": "Event title",
+      "starts_at": "ISO-8601 datetime string",
+      "ends_at": "ISO-8601 datetime string",
+      "description": "Event details",
+      "location": "Room or link"
+    }}
+  ],
+  "detected_conflicts": [
+    "Explanation of any conflict detected with existing calendar events or tasks"
+  ],
+  "recommended_action": "create_task" | "update_deadline" | "schedule_event" | "draft_reply" | "no_action_needed",
+  "draft_response_needed": false,
+  "draft_response": null
+}}"""
+

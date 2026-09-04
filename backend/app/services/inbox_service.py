@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.calendar_event import CalendarEvent
 from app.models.deadline import Deadline
+from app.models.email_message import EmailMessage
 from app.models.task import Task
 from app.services.audit_service import AuditService
 from app.services.gemini_service import GeminiService
@@ -80,6 +81,23 @@ class InboxService:
             content=content,
             source_type=source_type,
         )
+
+        # Save email record to database
+        if not dry_run and source_type == "email" and source_metadata and source_metadata.get("email_id"):
+            gmail_id = str(source_metadata["email_id"])
+            existing_email = db.query(EmailMessage).filter(EmailMessage.user_id == user_id, EmailMessage.gmail_id == gmail_id).first()
+            if not existing_email:
+                new_email = EmailMessage(
+                    user_id=user_id,
+                    gmail_id=gmail_id,
+                    sender=source_metadata.get("from", "Unknown"),
+                    subject=source_metadata.get("subject", "No Subject"),
+                    snippet=content[:300],
+                    body=content,
+                    has_tasks_extracted=bool(extraction.tasks),
+                )
+                db.add(new_email)
+                db.commit()
 
         created_tasks: list[dict[str, Any]] = []
         skipped_duplicates: list[str] = []

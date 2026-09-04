@@ -11,6 +11,7 @@ class UserResponse(APIModel):
     id: int
     email: str
     full_name: str
+    telegram_name: str | None = None
 
 
 class ProfileResponse(APIModel):

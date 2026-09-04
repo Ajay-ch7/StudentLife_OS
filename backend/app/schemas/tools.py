@@ -146,3 +146,38 @@ class CreateApprovalRequestToolInput(BaseModel):
     action_type: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
     metadata_json: str | None = None
+
+
+class SyncGoogleCalendarInput(BaseModel):
+    days_ahead: int = Field(14, ge=1, le=60, description="How many days ahead to sync")
+
+
+class CreateGoogleCalendarEventInput(BaseModel):
+    title: str = Field(..., min_length=1)
+    starts_at: datetime
+    ends_at: datetime
+    description: str | None = ""
+    location: str | None = ""
+
+
+class ListGmailMessagesInput(BaseModel):
+    query: str = Field("is:unread", description="Gmail search query like is:unread or from:professor")
+    max_results: int = Field(5, ge=1, le=20)
+
+
+class CreateEmailDraftInput(BaseModel):
+    to: str = Field(..., min_length=3, description="Recipient email address")
+    subject: str = Field(..., min_length=1, description="Email subject")
+    body: str = Field(..., min_length=1, description="Email body text")
+    thread_id: str | None = Field(None, description="Optional threadId to reply to")
+
+
+class SendEmailDraftInput(BaseModel):
+    draft_id: str = Field(..., min_length=1, description="ID of the Gmail draft to send")
+
+
+class ScanGmailInboxInput(BaseModel):
+    query: str = Field("is:unread", description="Gmail search query like is:unread, label:inbox, or subject:assignment")
+    max_results: int = Field(10, ge=1, le=30, description="Max emails to scan and process")
+    dry_run: bool = Field(False, description="Whether to preview extraction without creating tasks")
+

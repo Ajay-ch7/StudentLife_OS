@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.dependencies import get_current_user_id
 from app.db.database import get_db
 from app.models.dsa_problem import DSAProblem
-from app.schemas.dsa import DSAImport, DSAProblemCreate
+from app.schemas.dsa import DSAImport, DSAProblemCreate, DSAProblemResponse
 from app.services.dsa_service import DSAService
 
 router = APIRouter(prefix="/dsa", tags=["dsa"])
@@ -16,10 +16,23 @@ router = APIRouter(prefix="/dsa", tags=["dsa"])
 @router.get("")
 def progress(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> dict:
     items = db.query(DSAProblem).filter(DSAProblem.user_id == user_id).order_by(DSAProblem.solved_on.desc()).all()
-    return {"problems": items, **DSAService.summary(db, user_id)}
+    problems_data = [
+        {
+            "id": p.id,
+            "user_id": p.user_id,
+            "title": p.title,
+            "topic": p.topic,
+            "difficulty": p.difficulty,
+            "attempts": p.attempts,
+            "solved_on": p.solved_on.isoformat() if p.solved_on else None,
+            "needs_revision": p.needs_revision,
+        }
+        for p in items
+    ]
+    return {"problems": problems_data, **DSAService.summary(db, user_id)}
 
 
-@router.post("/problems")
+@router.post("/problems", response_model=DSAProblemResponse)
 def create_problem(payload: DSAProblemCreate, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> Any:
     item = DSAProblem(user_id=user_id, **payload.model_dump())
     db.add(item); db.commit(); db.refresh(item)

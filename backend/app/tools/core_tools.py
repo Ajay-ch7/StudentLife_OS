@@ -18,6 +18,8 @@ from app.schemas.tools import (
     CheckEligibilityInput,
     CreateApprovalRequestToolInput,
     CreateCalendarEventInput,
+    CreateEmailDraftInput,
+    CreateGoogleCalendarEventInput,
     CreateTaskInput,
     DetectConflictsInput,
     GenerateStudyPlanToolInput,
@@ -26,22 +28,31 @@ from app.schemas.tools import (
     GetDSAProgressInput,
     GetProfileInput,
     GetTasksInput,
+    ListGmailMessagesInput,
     ParseDocumentInput,
     RescheduleEventInput,
     SearchKnowledgeInput,
     SearchOpportunitiesInput,
+    ScanGmailInboxInput,
+    SendEmailDraftInput,
     SendTelegramMessageToolInput,
+    SyncGoogleCalendarInput,
     ToolAccessLevel,
     UpdateTaskInput,
 )
+from app.integrations.gmail_adapter import GmailAdapter
+from app.integrations.google_calendar_adapter import GoogleCalendarAdapter
 from app.services.audit_service import AuditService
 from app.services.gemini_service import GeminiService
+from app.services.inbox_service import InboxService
 from app.services.permission_service import PermissionService
 from app.tools.tool_registry import tool_registry
 
 settings = get_settings()
 gemini_service = GeminiService()
 telegram_adapter = TelegramAdapter(settings)
+google_calendar_adapter = GoogleCalendarAdapter()
+gmail_adapter = GmailAdapter()
 
 
 @tool_registry.register(
@@ -306,40 +317,38 @@ def detect_conflicts(payload: DetectConflictsInput, user_id: int, db: Session) -
     name="search_opportunities",
     input_model=SearchOpportunitiesInput,
     access_level=ToolAccessLevel.READ_LOCAL,
-    description="Search mock or stored internship and job listings by keyword.",
+    description="Search real stored internship and job listings by keyword.",
 )
 def search_opportunities(payload: SearchOpportunitiesInput, user_id: int, db: Session) -> list[dict[str, Any]]:
-    mock_opps = [
-        {
-            "id": "opp-1",
-            "title": "Backend Engineering Intern",
-            "company": "Stripe",
-            "skills": ["Python", "FastAPI", "SQL", "Distributed Systems"],
-            "location": "Remote / San Francisco",
-            "description": "Build high-throughput payment APIs using Python, FastAPI, and Postgres.",
-        },
-        {
-            "id": "opp-2",
-            "title": "Software Engineering Intern - Cloud Platform",
-            "company": "Google",
-            "skills": ["Python", "Go", "Kubernetes", "Algorithms"],
-            "location": "Mountain View, CA",
-            "description": "Design distributed storage and container infrastructure.",
-        },
-        {
-            "id": "opp-3",
-            "title": "AI / ML Systems Intern",
-            "company": "DeepMind",
-            "skills": ["Python", "PyTorch", "Algorithms", "DSA"],
-            "location": "London / Remote",
-            "description": "Optimize inference runtimes and evaluation pipelines.",
-        },
-    ]
-    query_lower = payload.query.lower()
+    from app.models.opportunity import Opportunity
+    all_opps = db.query(Opportunity).filter(Opportunity.user_id == user_id).order_by(Opportunity.match_score.desc().nullslast(), Opportunity.id.desc()).all()
+    
+    if not all_opps:
+        return []
+
+    if payload.query and payload.query.strip():
+        terms = [t.lower() for t in payload.query.strip().split() if len(t) > 2]
+        matched = []
+        for o in all_opps:
+            haystack = f"{o.title} {o.company} {o.description} {o.required_skills or ''}".lower()
+            if any(term in haystack for term in terms):
+                matched.append(o)
+        if matched:
+            all_opps = matched
+
     return [
-        opp for opp in mock_opps
-        if query_lower in opp["title"].lower() or any(query_lower in s.lower() for s in opp["skills"])
-    ][: payload.limit]
+        {
+            "id": o.id,
+            "title": o.title,
+            "company": o.company,
+            "description": o.description,
+            "required_skills": o.required_skills,
+            "match_score": o.match_score,
+            "url": o.url,
+            "source": o.source,
+        }
+        for o in all_opps[: payload.limit]
+    ]
 
 
 @tool_registry.register(
@@ -527,3 +536,165 @@ def create_approval_request(payload: CreateApprovalRequestToolInput, user_id: in
         metadata_json=payload.metadata_json,
     )
     return {"id": req.id, "action_type": req.action_type, "status": req.status}
+
+
+@tool_registry.register(
+    name="sync_google_calendar",
+    input_model=SyncGoogleCalendarInput,
+    access_level=ToolAccessLevel.WRITE_LOCAL,
+    description="Sync events from the user's primary Google Calendar into the local schedule database.",
+)
+def sync_google_calendar(payload: SyncGoogleCalendarInput, user_id: int, db: Session) -> dict[str, Any]:
+    res = google_calendar_adapter.sync_to_local_db(db, user_id, days_ahead=payload.days_ahead)
+    AuditService.log_user_activity(
+        db=db,
+        user_id=user_id,
+        activity_type="google_calendar_synced",
+        message=f"Synced {res.get('synced_count', 0)} events from Google Calendar",
+        metadata=res,
+    )
+    return res
+
+
+@tool_registry.register(
+    name="create_google_calendar_event",
+    input_model=CreateGoogleCalendarEventInput,
+    access_level=ToolAccessLevel.EXTERNAL_ACTION,
+    description="Create a new event on Google Calendar and add it to the local schedule.",
+)
+def create_google_calendar_event(payload: CreateGoogleCalendarEventInput, user_id: int, db: Session) -> dict[str, Any]:
+    # 1. Insert into Google Calendar
+    google_res = google_calendar_adapter.create_event(
+        title=payload.title,
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        description=payload.description or "",
+        location=payload.location or "",
+    )
+    # 2. Also record locally in SQLite
+    local_event = CalendarEvent(
+        user_id=user_id,
+        google_event_id=google_res.get("google_id"),
+        title=payload.title,
+        description=payload.description,
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        location=payload.location,
+        event_type="commitment",
+        creation_notified=True,
+    )
+    db.add(local_event)
+    db.commit()
+    db.refresh(local_event)
+
+    return {
+        "local_event_id": local_event.id,
+        "google_result": google_res,
+        "status": "success",
+    }
+
+
+@tool_registry.register(
+    name="list_gmail_messages",
+    input_model=ListGmailMessagesInput,
+    access_level=ToolAccessLevel.READ_LOCAL,
+    description="Fetch recent email messages or announcements from Gmail.",
+)
+def list_gmail_messages(payload: ListGmailMessagesInput, user_id: int, db: Session) -> list[dict[str, Any]]:
+    return gmail_adapter.list_recent_messages(query=payload.query, max_results=payload.max_results)
+
+
+@tool_registry.register(
+    name="create_email_draft",
+    input_model=CreateEmailDraftInput,
+    access_level=ToolAccessLevel.EXTERNAL_ACTION,
+    description="Create an email draft in Gmail and generate an approval request for sending it.",
+)
+def create_email_draft(payload: CreateEmailDraftInput, user_id: int, db: Session) -> dict[str, Any]:
+    from app.services.approval_service import ApprovalService
+
+    draft_res = gmail_adapter.create_draft(
+        to=payload.to,
+        subject=payload.subject,
+        body_text=payload.body,
+        thread_id=payload.thread_id,
+    )
+    if draft_res.get("status") == "success":
+        draft_id = draft_res.get("draft_id")
+        # Automatically record an approval request so human must approve sending
+        req = ApprovalService.create(
+            db=db,
+            user_id=user_id,
+            action_type="send_email_draft",
+            description=f"Send drafted email to {payload.to} with subject '{payload.subject}'",
+            metadata_json=json.dumps({"draft_id": draft_id, "to": payload.to, "subject": payload.subject}),
+        )
+        draft_res["approval_request_id"] = req.id
+        draft_res["requires_approval"] = True
+    return draft_res
+
+
+@tool_registry.register(
+    name="send_email_draft",
+    input_model=SendEmailDraftInput,
+    access_level=ToolAccessLevel.EXTERNAL_OR_CONSEQUENTIAL,
+    requires_approval=True,
+    description="Send a previously drafted Gmail message (strictly requires user approval).",
+)
+def send_email_draft(payload: SendEmailDraftInput, user_id: int, db: Session) -> dict[str, Any]:
+    send_res = gmail_adapter.send_draft(draft_id=payload.draft_id)
+    AuditService.log_user_activity(
+        db=db,
+        user_id=user_id,
+        activity_type="email_draft_sent",
+        message=f"Dispatched Gmail draft {payload.draft_id}",
+        metadata=send_res,
+    )
+    return send_res
+
+
+@tool_registry.register(
+    name="scan_gmail_inbox",
+    input_model=ScanGmailInboxInput,
+    access_level=ToolAccessLevel.WRITE_LOCAL,
+    description="Scan recent Gmail messages, analyze content for assignments, exams, and opportunities using Gemini, and create tasks/deadlines.",
+)
+async def scan_gmail_inbox(payload: ScanGmailInboxInput, user_id: int, db: Session) -> dict[str, Any]:
+    inbox_service = InboxService(gemini_service)
+    messages = gmail_adapter.list_recent_messages(query=payload.query, max_results=payload.max_results)
+    
+    if not messages:
+        return {
+            "status": "success",
+            "messages_scanned": 0,
+            "tasks_created": [],
+            "message": "No emails found matching query.",
+        }
+
+    all_created_tasks = []
+    scanned_summaries = []
+
+    for msg in messages:
+        content = f"From: {msg.get('from')}\nSubject: {msg.get('subject')}\nDate: {msg.get('date')}\n\n{msg.get('body') or msg.get('snippet', '')}"
+        res = await inbox_service.process_content(
+            db=db,
+            user_id=user_id,
+            content=content,
+            source_type="email",
+            source_metadata={"email_id": msg.get("id"), "subject": msg.get("subject"), "from": msg.get("from")},
+            dry_run=payload.dry_run,
+        )
+        scanned_summaries.append({
+            "subject": msg.get("subject"),
+            "from": msg.get("from"),
+            "tasks_extracted": res.get("total_extracted", 0),
+        })
+        all_created_tasks.extend(res.get("tasks_created", []))
+
+    return {
+        "status": "success",
+        "messages_scanned": len(messages),
+        "tasks_created": all_created_tasks,
+        "scanned_emails": scanned_summaries,
+    }
+

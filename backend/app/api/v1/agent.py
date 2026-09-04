@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.activity_log import ActivityLog
 from app.models.agent_action import AgentAction
 from openclaw.workflows.briefing_workflow import MorningBriefingWorkflow
+from openclaw.workflows.email_to_action_workflow import EmailToActionWorkflow
 from openclaw.workflows.inbox_workflow import InboxProcessingWorkflow
 from openclaw.workflows.opportunity_workflow import OpportunityEvaluationWorkflow
 from openclaw.workflows.dsa_workflow import DSARecommendationWorkflow
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 WORKFLOWS = {
     "inbox_processing": InboxProcessingWorkflow,
+    "email_to_action": EmailToActionWorkflow,
     "morning_briefing": MorningBriefingWorkflow,
     "opportunity_evaluation": OpportunityEvaluationWorkflow,
     "dsa_recommendation": DSARecommendationWorkflow,
@@ -29,8 +31,18 @@ WORKFLOWS = {
 
 
 class RunWorkflowRequest(BaseModel):
-    workflow_name: Literal["inbox_processing", "morning_briefing", "opportunity_evaluation", "dsa_recommendation", "end_of_day_review", "course_planning", "opportunity_updates"]
+    workflow_name: Literal[
+        "inbox_processing",
+        "email_to_action",
+        "morning_briefing",
+        "opportunity_evaluation",
+        "dsa_recommendation",
+        "end_of_day_review",
+        "course_planning",
+        "opportunity_updates",
+    ]
     payload: dict[str, Any] = Field(default_factory=dict)
+
 
 
 class WorkflowExecutionResponse(BaseModel):
@@ -47,6 +59,22 @@ def get_agent_status() -> dict[str, Any]:
         "agent": "OpenClaw Local Runtime",
         "available_workflows": list(WORKFLOWS.keys()),
     }
+
+
+@router.get("/context")
+async def get_agent_context(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Inspect the live context and data that OpenClaw agents receive and reason over."""
+    from openclaw.agent.student_life_agent import StudentLifeAgent
+    agent = StudentLifeAgent()
+    context = await agent.get_student_context(user_id=user_id, db=db)
+    return {
+        "user_id": user_id,
+        "context": context,
+    }
+
 
 
 @router.post("/run-workflow", response_model=WorkflowExecutionResponse)
