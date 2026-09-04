@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
 export type ProfileResponse = {
   user: { id: number; email: string; full_name: string };
@@ -15,7 +15,60 @@ export type Assignment = { id: number; course_name: string; title: string; descr
 export type Exam = { id: number; course_name: string; title: string; starts_at: string; notes: string | null };
 export type StudySession = { id: number; topic: string; task_id: number | null; planned_start: string; planned_end: string; actual_start: string | null; actual_end: string | null; status: string };
 export type Opportunity = { id: number; title: string; company: string; description: string; required_skills: string | null; match_score: number | null; source: string };
-export type DSAProgress = { total: number; streak: number; topics: Record<string, number>; weak_topics: string[]; problems: Array<{ id: number; title: string; topic: string; difficulty: string; solved_on: string; needs_revision: boolean }> };
+export type DSAProgress = {
+  username?: string;
+  total: number;
+  easy_solved?: number;
+  medium_solved?: number;
+  hard_solved?: number;
+  streak: number;
+  active_days?: number;
+  ranking?: number | null;
+  last_polled_at?: string | null;
+  topics: Record<string, number>;
+  weak_topics: string[];
+  problems: Array<{ id: number; title: string; topic: string; difficulty: string; solved_on: string; needs_revision: boolean }>;
+};
+
+export type JobApplicationDSASummary = {
+  application_id: number;
+  opportunity_id: number;
+  company: string;
+  role: string;
+  status: string;
+  total_planned: number;
+  solved_count: number;
+  remaining_count: number;
+  completion_percentage: number;
+};
+
+export type JobDSAProblemItem = {
+  id: number;
+  title: string;
+  title_slug: string;
+  topic: string;
+  difficulty: string;
+  company: string;
+  notes?: string | null;
+  is_solved: boolean;
+  solved_on?: string | null;
+  leetcode_url?: string | null;
+};
+
+export type JobDSAPlanDetails = {
+  application_id: number;
+  opportunity_id: number;
+  company: string;
+  role: string;
+  status: string;
+  total_planned: number;
+  solved_count: number;
+  remaining_count: number;
+  completion_percentage: number;
+  planned_problems: JobDSAProblemItem[];
+  solved_problems: JobDSAProblemItem[];
+  remaining_problems: JobDSAProblemItem[];
+};
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -70,14 +123,14 @@ export const api = {
   getAssignments: () => request<Assignment[]>('/academic/assignments'),
   getExams: () => request<Exam[]>('/academic/exams'),
   getStudySessions: () => request<StudySession[]>('/academic/study-sessions'),
-  requestRecovery: () => request<{ approval_request_id: number | null }>('/focus/recovery', { method: 'POST', body: '{}' }),
-  startFocusSession: (id: number) => request<StudySession>(`/focus/sessions/${id}/start`, { method: 'PUT', body: '{}' }),
-  endFocusSession: (id: number) => request<StudySession>(`/focus/sessions/${id}/end`, { method: 'PUT', body: '{}' }),
   getOpportunities: () => request<Opportunity[]>('/opportunities'),
   getDsa: () => request<DSAProgress>('/dsa'),
   getDsaRecommendations: () => request<{ topics: string[]; recommendation: string }>('/dsa/recommendations'),
+  syncLeetCode: () => request<{ status: string; username: string; total_solved: number; newly_solved_count: number }>('/dsa/leetcode/sync', { method: 'POST' }),
+  getDsaJobApplications: () => request<JobApplicationDSASummary[]>('/dsa/job-applications'),
+  getDsaJobPlan: (applicationId: number) => request<JobDSAPlanDetails>(`/dsa/job-applications/${applicationId}/plan`),
   processInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/process', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   previewInbox: (content: string, source_type = 'email') => request<InboxProcessResponse>('/inbox/preview', { method: 'POST', body: JSON.stringify({ content, source_type }) }),
   generateBriefing: (send_notification = false, chat_id?: string) => request<MorningBriefingResponse>('/workflows/morning-briefing', { method: 'POST', body: JSON.stringify({ send_notification, chat_id }) }),
   getNotifications: () => request<Array<{ id: number; type: string; message: string; metadata: string | null; created_at: string }>>('/notifications'),
-};
+};

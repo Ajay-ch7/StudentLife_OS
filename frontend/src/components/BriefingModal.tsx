@@ -95,7 +95,7 @@ export default function BriefingModal({ isOpen, onClose }: Props) {
 
             {briefingData.briefing.recommended_recovery_action && (
               <div style={{ padding: '0.75rem', background: 'rgba(103, 211, 145, 0.1)', border: '1px solid rgba(103, 211, 145, 0.3)', borderRadius: '4px' }}>
-                <strong style={{ color: '#67d391', fontSize: '0.85rem' }}>🛠️ Pro-tip / Focus Recovery:</strong>
+                <strong style={{ color: '#67d391', fontSize: '0.85rem' }}>🛠️ Pro-tip / Daily Recovery:</strong>
                 <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#e2e8ee' }}>
                   {briefingData.briefing.recommended_recovery_action}
                 </p>

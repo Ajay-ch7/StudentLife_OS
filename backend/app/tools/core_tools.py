@@ -37,6 +37,7 @@ from app.schemas.tools import (
     SendEmailDraftInput,
     SendTelegramMessageToolInput,
     SyncGoogleCalendarInput,
+    SyncLeetCodeProgressInput,
     ToolAccessLevel,
     UpdateTaskInput,
 )
@@ -697,4 +698,25 @@ async def scan_gmail_inbox(payload: ScanGmailInboxInput, user_id: int, db: Sessi
         "tasks_created": all_created_tasks,
         "scanned_emails": scanned_summaries,
     }
+
+
+@tool_registry.register(
+    name="sync_leetcode_progress",
+    input_model=SyncLeetCodeProgressInput,
+    access_level=ToolAccessLevel.WRITE_LOCAL,
+    description="Fetch and sync student's latest LeetCode accepted submissions and update DSA progress.",
+)
+async def sync_leetcode_progress(payload: SyncLeetCodeProgressInput, user_id: int, db: Session) -> dict[str, Any]:
+    from app.services.leetcode_watcher_service import leetcode_watcher_service
+
+    if payload.username:
+        from app.models.student_profile import StudentProfile
+        profile = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
+        if profile:
+            profile.leetcode_username = payload.username
+            db.commit()
+
+    res = await leetcode_watcher_service.check_user_leetcode_updates(db=db, user_id=user_id)
+    return res
+
 

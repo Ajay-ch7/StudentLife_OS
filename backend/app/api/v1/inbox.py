@@ -1,6 +1,6 @@
 from typing import Any
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import get_current_user_id
@@ -74,8 +74,7 @@ class EmailItemResponse(BaseModel):
     category: str = "general"
     has_tasks_extracted: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/emails", response_model=list[EmailItemResponse])

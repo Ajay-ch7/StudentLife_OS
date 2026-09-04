@@ -8,8 +8,8 @@ from app.db.database import Base
 from app.models.student_profile import User
 from app.models.study_session import StudySession
 from app.services.dsa_service import DSAService
-from app.services.focus_service import FocusService
 from app.services.study_plan_service import StudyPlanService
+from openclaw.workflows.end_of_day_review import EndOfDayReviewWorkflow
 
 
 @pytest.fixture
@@ -63,13 +63,15 @@ def test_dsa_csv_import_syncs_topic_progress(session):
     assert DSAService.summary(db, user.id)["total"] == 2
 
 
-def test_missed_focus_session_is_marked_missed(session):
+@pytest.mark.asyncio
+async def test_missed_focus_session_is_marked_missed(session):
     db, user = session
-    now = datetime(2026, 9, 4, 18, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     study = StudySession(user_id=user.id, topic="Recovery", planned_start=now - timedelta(hours=2), planned_end=now - timedelta(hours=1))
     db.add(study)
     db.commit()
 
-    missed = FocusService.missed(db, user.id, now=now)
-    assert [item.id for item in missed] == [study.id]
+    workflow = EndOfDayReviewWorkflow()
+    res = await workflow.run(user.id, db)
+    assert res["missed_session_ids"] == [study.id]
     assert db.get(StudySession, study.id).status == "missed"

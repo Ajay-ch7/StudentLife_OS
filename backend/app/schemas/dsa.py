@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DSAProblemCreate(BaseModel):
@@ -15,8 +15,7 @@ class DSAProblemResponse(DSAProblemCreate):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DSAImport(BaseModel):

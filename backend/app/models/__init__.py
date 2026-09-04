@@ -9,6 +9,8 @@ from app.models.course import Course
 from app.models.deadline import Deadline
 from app.models.dsa_problem import DSAProblem
 from app.models.dsa_progress import DSAProgress
+from app.models.job_dsa_plan import JobDSAPlanProblem
+from app.models.leetcode_state import LeetCodeState
 from app.models.email_message import EmailMessage
 from app.models.exam import Exam
 from app.models.opportunity import Opportunity
@@ -32,6 +34,8 @@ __all__ = [
 	"Deadline",
 	"DSAProblem",
 	"DSAProgress",
+	"JobDSAPlanProblem",
+	"LeetCodeState",
 	"Exam",
 	"Opportunity",
 	"Note",

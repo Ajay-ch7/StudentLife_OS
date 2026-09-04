@@ -32,5 +32,6 @@ class StudentProfile(Base):
     available_study_hours: Mapped[float | None] = mapped_column(nullable=True)
     preferred_study_times: Mapped[str | None] = mapped_column(String(500), nullable=True)
     notification_preferences: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    leetcode_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="profile")

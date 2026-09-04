@@ -181,3 +181,8 @@ class ScanGmailInboxInput(BaseModel):
     max_results: int = Field(10, ge=1, le=30, description="Max emails to scan and process")
     dry_run: bool = Field(False, description="Whether to preview extraction without creating tasks")
 
+
+class SyncLeetCodeProgressInput(BaseModel):
+    username: str | None = Field(None, description="Optional LeetCode username to sync")
+
+

@@ -8,7 +8,7 @@ import sys
 import httpx
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "backend"))
 from app.core.config import get_settings
 
@@ -16,7 +16,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 TOKEN = get_settings().telegram_bot_token
 BASE  = f"https://api.telegram.org/bot{TOKEN}"
-ENV   = Path(__file__).parent / ".env"
+ENV   = ROOT_DIR / ".env"
 
 
 async def main() -> None:

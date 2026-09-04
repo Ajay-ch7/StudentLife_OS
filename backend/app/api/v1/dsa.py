@@ -73,3 +73,59 @@ def recommendations(user_id: int = Depends(get_current_user_id), db: Session = D
     items = db.query(DSAProblem).filter(DSAProblem.user_id == user_id).all()
     summary = DSAService.summary(db, user_id)
     return {"topics": summary["weak_topics"], "recommendation": f"Practice one problem in {summary['weak_topics'][0]}." if summary["weak_topics"] else "Keep your current rhythm."}
+
+
+@router.post("/leetcode/sync")
+async def sync_leetcode(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> dict:
+    from app.services.leetcode_watcher_service import leetcode_watcher_service
+    res = await leetcode_watcher_service.check_user_leetcode_updates(db, user_id)
+    return res
+
+
+@router.get("/job-applications")
+def get_job_applications_dsa_summary(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> list[dict]:
+    return DSAService.get_job_applications_dsa_summary(db, user_id)
+
+
+@router.get("/job-applications/{application_id}/plan")
+def get_job_dsa_plan(application_id: int, user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> dict:
+    plan = DSAService.get_job_dsa_plan(db, user_id, application_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Job application DSA plan not found")
+    return plan
+
+
+@router.get("/leetcode/status")
+def leetcode_status(user_id: int = Depends(get_current_user_id), db: Session = Depends(get_db)) -> dict:
+    from app.models.leetcode_state import LeetCodeState
+    from app.services.leetcode_watcher_service import leetcode_watcher_service
+
+    username = leetcode_watcher_service.get_configured_username(db, user_id)
+    state = db.query(LeetCodeState).filter(LeetCodeState.user_id == user_id).first()
+    if not state:
+        return {
+            "username": username,
+            "has_state": False,
+            "total_solved": 0,
+            "easy_solved": 0,
+            "medium_solved": 0,
+            "hard_solved": 0,
+            "streak": 0,
+            "active_days": 0,
+            "ranking": None,
+            "last_polled_at": None,
+        }
+
+    return {
+        "username": state.leetcode_username,
+        "has_state": True,
+        "total_solved": state.total_solved,
+        "easy_solved": state.easy_solved,
+        "medium_solved": state.medium_solved,
+        "hard_solved": state.hard_solved,
+        "streak": state.streak,
+        "active_days": state.active_days,
+        "ranking": state.ranking,
+        "last_submission_id": state.last_submission_id,
+        "last_polled_at": state.last_polled_at.isoformat() if state.last_polled_at else None,
+    }

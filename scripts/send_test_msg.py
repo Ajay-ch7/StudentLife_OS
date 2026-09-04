@@ -5,7 +5,7 @@ import httpx
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from pathlib import Path
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "backend"))
 from app.core.config import get_settings
 

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     telegram_polling_enabled: bool = True
     google_client_secrets_file: str = "credentials.json"
     google_token_file: str = "data/google_token.json"
+    leetcode_username: str = "leetcode_demo"
+    leetcode_poll_interval_seconds: int = 60
+    leetcode_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

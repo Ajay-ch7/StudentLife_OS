@@ -3,11 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, focus, inbox, opportunities, profile, resources, tasks, tools
+from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, inbox, opportunities, profile, resources, tasks, tools
 from app.core.config import ensure_data_directories, get_settings
 from app.core.exceptions import unhandled_exception_handler
 from app.core.logging import configure_logging
 from app.db.database import init_db
+from app.services.leetcode_watcher_service import leetcode_watcher_service
 from app.services.realtime_sync_service import realtime_sync_service
 from app.services.telegram_bot_listener import telegram_bot_listener
 
@@ -21,11 +22,15 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     polling_task = None
     sync_task = None
+    leetcode_task = None
     if settings.telegram_polling_enabled and not settings.telegram_mock_mode and settings.telegram_bot_token:
         polling_task = asyncio.create_task(telegram_bot_listener.start_polling())
     
     # Start continuous background Gmail & Calendar real-time sync
     sync_task = asyncio.create_task(realtime_sync_service.start_periodic_sync())
+
+    # Start autonomous LeetCode polling watcher
+    leetcode_task = asyncio.create_task(leetcode_watcher_service.start_periodic_sync())
 
     yield
 
@@ -42,6 +47,14 @@ async def lifespan(app: FastAPI):
         sync_task.cancel()
         try:
             await sync_task
+        except asyncio.CancelledError:
+            pass
+
+    if leetcode_task:
+        leetcode_watcher_service.stop()
+        leetcode_task.cancel()
+        try:
+            await leetcode_task
         except asyncio.CancelledError:
             pass
 
@@ -68,7 +81,6 @@ app.include_router(approvals.router, prefix="/api/v1")
 app.include_router(academic.router, prefix="/api/v1")
 app.include_router(opportunities.router, prefix="/api/v1")
 app.include_router(dsa.router, prefix="/api/v1")
-app.include_router(focus.router, prefix="/api/v1")
 app.include_router(resources.router, prefix="/api/v1")
 
 

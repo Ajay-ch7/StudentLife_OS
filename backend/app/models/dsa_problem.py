@@ -17,4 +17,5 @@ class DSAProblem(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     solved_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     needs_revision: Mapped[bool] = mapped_column(default=False, nullable=False)
+    leetcode_submission_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OpportunityCreate(BaseModel):
@@ -21,8 +21,7 @@ class OpportunityResponse(BaseModel):
     source: str = "manual"
     url: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApplicationCreate(BaseModel):
@@ -37,6 +36,5 @@ class ApplicationResponse(BaseModel):
     status: str
     notes: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 

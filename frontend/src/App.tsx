@@ -9,9 +9,8 @@ import ApprovalsPage from './pages/ApprovalsPage';
 import AcademicPage from './pages/AcademicPage';
 import OpportunitiesPage from './pages/OpportunitiesPage';
 import DSAPage from './pages/DSAPage';
-import FocusPage from './pages/FocusPage';
 
-type View = 'dashboard' | 'tasks' | 'calendar' | 'academic' | 'opportunities' | 'dsa' | 'focus' | 'approvals' | 'settings';
+type View = 'dashboard' | 'tasks' | 'calendar' | 'academic' | 'opportunities' | 'dsa' | 'approvals' | 'settings';
 type WorkspaceData = { profile: ProfileResponse; tasks: Task[]; calendar: CalendarEvent[]; approvals: Approval[] };
 
 function formatDate(value: string | null) {
@@ -43,7 +42,7 @@ export default function App() {
     <div className="app-frame">
       <aside className="sidebar">
         <div className="brand-mark">SL</div><div className="brand-copy"><strong>Student Life</strong><span>OS / local workspace</span></div>
-        <nav aria-label="Primary navigation"><button className={view === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dashboard')}>Dashboard</button><button className={view === 'tasks' ? 'nav-link active' : 'nav-link'} onClick={() => setView('tasks')}>Tasks</button><button className={view === 'calendar' ? 'nav-link active' : 'nav-link'} onClick={() => setView('calendar')}>Calendar</button><button className={view === 'academic' ? 'nav-link active' : 'nav-link'} onClick={() => setView('academic')}>Academic</button><button className={view === 'opportunities' ? 'nav-link active' : 'nav-link'} onClick={() => setView('opportunities')}>Career</button><button className={view === 'dsa' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dsa')}>DSA</button><button className={view === 'focus' ? 'nav-link active' : 'nav-link'} onClick={() => setView('focus')}>Focus</button><button className={view === 'approvals' ? 'nav-link active' : 'nav-link'} onClick={() => setView('approvals')}>Approvals</button><button className={view === 'settings' ? 'nav-link active' : 'nav-link'} onClick={() => setView('settings')}>Settings</button></nav>
+        <nav aria-label="Primary navigation"><button className={view === 'dashboard' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dashboard')}>Dashboard</button><button className={view === 'tasks' ? 'nav-link active' : 'nav-link'} onClick={() => setView('tasks')}>Tasks</button><button className={view === 'calendar' ? 'nav-link active' : 'nav-link'} onClick={() => setView('calendar')}>Calendar</button><button className={view === 'academic' ? 'nav-link active' : 'nav-link'} onClick={() => setView('academic')}>Academic</button><button className={view === 'opportunities' ? 'nav-link active' : 'nav-link'} onClick={() => setView('opportunities')}>Career</button><button className={view === 'dsa' ? 'nav-link active' : 'nav-link'} onClick={() => setView('dsa')}>DSA</button><button className={view === 'approvals' ? 'nav-link active' : 'nav-link'} onClick={() => setView('approvals')}>Approvals</button><button className={view === 'settings' ? 'nav-link active' : 'nav-link'} onClick={() => setView('settings')}>Settings</button></nav>
         <div className="sidebar-footer"><span className="status-dot" /> Local mode</div>
       </aside>
       <main className="app-shell">
@@ -56,7 +55,6 @@ export default function App() {
         {data && data.profile.profile !== null && view === 'academic' && <AcademicPage />}
         {data && data.profile.profile !== null && view === 'opportunities' && <OpportunitiesPage />}
         {data && data.profile.profile !== null && view === 'dsa' && <DSAPage />}
-        {data && data.profile.profile !== null && view === 'focus' && <FocusPage />}
         {data && data.profile.profile !== null && view === 'approvals' && <ApprovalsPage approvals={data.approvals} onChanged={(approvals) => setData({ ...data, approvals })} />}
         {data?.profile.profile !== null && view === 'dashboard' && <section className="dashboard-content"><div className="section-heading"><div><p className="eyebrow">At a glance</p><h2>Today&apos;s rhythm</h2></div><span className="muted">{data?.tasks.length ?? 0} active tasks</span></div><section className="grid">
           <div className="card feature-card"><div className="card-heading"><h2>Tasks</h2><span className="number">{data?.tasks.length ?? 0}</span></div>{data?.tasks.length ? <ul>{data.tasks.slice(0, 4).map((task) => <li key={task.id}><span>{task.title}</span><time>{formatDate(task.deadline)}</time></li>)}</ul> : <EmptyState message="Your task list is clear." />}</div>

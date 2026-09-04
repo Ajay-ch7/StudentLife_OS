@@ -26,6 +26,8 @@ def test_schema_contains_phase_one_tables() -> None:
         "deadlines",
         "dsa_problems",
         "dsa_progress",
+        "job_dsa_plan_problems",
+        "leetcode_state",
         "email_messages",
         "exams",
         "opportunities",

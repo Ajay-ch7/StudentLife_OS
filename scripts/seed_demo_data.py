@@ -3,11 +3,12 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "backend"))
 sys.path.insert(0, str(ROOT_DIR))
 
 from app.db.database import SessionLocal, init_db
+from app.db.seed import DEFAULT_USER_EMAIL
 from app.models.student_profile import User, StudentProfile
 from app.models.calendar_event import CalendarEvent
 from app.models.task import Task
@@ -24,6 +25,7 @@ from app.models.study_plan import StudyPlan
 from app.models.note import Note
 from app.models.project import Project
 from app.models.study_material import StudyMaterial
+from app.services.dsa_service import DSAService
 
 
 def seed() -> None:
@@ -35,18 +37,18 @@ def seed() -> None:
         # ───────────────────────────────────────────────────
         # 1. User & Profile  (matches the default user seed)
         # ───────────────────────────────────────────────────
-        user = db.query(User).filter(User.email == "kriti@university.edu").first()
+        user = db.query(User).filter(User.email == DEFAULT_USER_EMAIL).first()
         if not user:
             user = User(
-                email="kriti@university.edu",
-                full_name="Kriti",
+                email=DEFAULT_USER_EMAIL,
+                full_name="Kriti Karunam",
                 telegram_name="kriti",
             )
             db.add(user)
             db.commit()
             db.refresh(user)
         else:
-            user.full_name = "Kriti"
+            user.full_name = "Kriti Karunam"
             user.telegram_name = "kriti"
             db.commit()
             db.refresh(user)
@@ -398,18 +400,8 @@ def seed() -> None:
             DSAProblem(user_id=user.id, title="Kth Largest Element", topic="Heaps", difficulty="medium", attempts=1, solved_on=today_date),
         ]
         db.add_all(dsa_problems)
-
-        dsa_progress = [
-            DSAProgress(user_id=user.id, topic="Arrays", solved_count=12, revision_count=2),
-            DSAProgress(user_id=user.id, topic="Stacks", solved_count=8, revision_count=1),
-            DSAProgress(user_id=user.id, topic="Linked Lists", solved_count=7, revision_count=1),
-            DSAProgress(user_id=user.id, topic="Trees", solved_count=10, revision_count=3),
-            DSAProgress(user_id=user.id, topic="Graphs", solved_count=6, revision_count=2),
-            DSAProgress(user_id=user.id, topic="Dynamic Programming", solved_count=9, revision_count=4),
-            DSAProgress(user_id=user.id, topic="Design", solved_count=3, revision_count=1),
-            DSAProgress(user_id=user.id, topic="Heaps", solved_count=4, revision_count=0),
-        ]
-        db.add_all(dsa_progress)
+        db.commit()
+        DSAService.sync_progress(db, user.id)
 
         # ───────────────────────────────────────────────
         # 10. Opportunities (internships/jobs)
@@ -595,7 +587,7 @@ def seed() -> None:
         print("=" * 60)
         print(" [OK] Demo data seeded successfully for Kriti!")
         print("=" * 60)
-        print(f" User:            Kriti (kriti@university.edu)")
+        print(f" User:            {user.full_name} ({user.email})")
         print(f" Telegram Name:   kriti")
         print(f" Profile:         3rd Year CSE @ NIT Warangal, 8.85 CGPA")
         print(f" Courses:         {len(courses)}")
@@ -605,7 +597,7 @@ def seed() -> None:
         print(f" Assignments:     {len(assignments)}")
         print(f" Exams:           {len(exams)}")
         print(f" Study Sessions:  {len(sessions)}")
-        print(f" DSA Problems:    {len(dsa_problems)} solved, {len(dsa_progress)} topic summaries")
+        print(f" DSA Problems:    {len(dsa_problems)} solved, {db.query(DSAProgress).filter(DSAProgress.user_id == user.id).count()} topic summaries")
         print(f" Opportunities:   {len(opportunities)}")
         print(f" Study Plans:     {len(plans)}")
         print(f" Projects:        {len(projects)}")

@@ -23,6 +23,7 @@ def init_db() -> None:
 			"available_study_hours": "FLOAT",
 			"preferred_study_times": "VARCHAR(500)",
 			"notification_preferences": "VARCHAR(1000)",
+			"leetcode_username": "VARCHAR(255)",
 		}
 		with engine.begin() as connection:
 			# Migrate users table
@@ -35,6 +36,12 @@ def init_db() -> None:
 			for column, column_type in _profile_columns.items():
 				if column not in existing:
 					connection.execute(text(f"ALTER TABLE student_profiles ADD COLUMN {column} {column_type}"))
+
+			# Migrate dsa_problems table
+			dsa_columns = {column["name"] for column in inspect(connection).get_columns("dsa_problems")}
+			if "leetcode_submission_id" not in dsa_columns:
+				connection.execute(text("ALTER TABLE dsa_problems ADD COLUMN leetcode_submission_id VARCHAR(100)"))
+
 			event_columns = {column["name"] for column in inspect(connection).get_columns("calendar_events")}
 			for column, column_type in {
 				"task_id": "INTEGER",
@@ -52,6 +59,17 @@ def init_db() -> None:
 			}.items():
 				if column not in approval_columns:
 					connection.execute(text(f"ALTER TABLE approval_requests ADD COLUMN {column} {column_type}"))
+
+			# Migrate leetcode_state table
+			if inspect(connection).has_table("leetcode_state"):
+				lc_columns = {column["name"] for column in inspect(connection).get_columns("leetcode_state")}
+				for column, column_type in {
+					"streak": "INTEGER DEFAULT 0",
+					"active_days": "INTEGER DEFAULT 0",
+					"ranking": "INTEGER",
+				}.items():
+					if column not in lc_columns:
+						connection.execute(text(f"ALTER TABLE leetcode_state ADD COLUMN {column} {column_type}"))
 
 			# Migrate email_messages table
 			email_columns = {column["name"] for column in inspect(connection).get_columns("email_messages")}

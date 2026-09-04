@@ -6,7 +6,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Parse .env
-env_path = Path(__file__).parent / ".env"
+env_path = Path(__file__).parents[1] / ".env"
 env_vars = {}
 for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
     line = line.strip()

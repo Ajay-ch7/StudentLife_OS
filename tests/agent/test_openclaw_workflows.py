@@ -8,6 +8,7 @@ from app.db.database import Base
 from app.main import app
 from app.models.student_profile import StudentProfile, User
 from app.models.task import Task
+from app.models.opportunity import Opportunity
 from openclaw.workflows.briefing_workflow import MorningBriefingWorkflow
 from openclaw.workflows.inbox_workflow import InboxProcessingWorkflow
 from openclaw.workflows.opportunity_workflow import OpportunityEvaluationWorkflow
@@ -35,6 +36,20 @@ def workflow_test_db():
         available_study_hours=4.0,
     )
     session.add(profile)
+    session.commit()
+
+    # Seed an opportunity so OpportunityEvaluationWorkflow can find something
+    opp = Opportunity(
+        user_id=user.id,
+        title="Backend Software Engineer Intern",
+        company="TechCorp",
+        description="Backend engineering internship. Requires Python, FastAPI, SQL.",
+        required_skills="Python, FastAPI, SQL",
+        source="test",
+        url="https://techcorp.example.com/jobs/backend-intern",
+        match_score=0.85,
+    )
+    session.add(opp)
     session.commit()
 
     yield session, user

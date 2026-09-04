@@ -424,6 +424,26 @@ Local OpenClaw → Gemini reasoning → Validated tools → SQLite persistence �
 
 ---
 
+### Commands to start
+```
+# Full app (backend + frontend together)
+python start.py
+
+# Backend only
+.\venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
+
+# Frontend only  
+cd frontend && npm run dev
+
+# Utility scripts
+python scripts/seed_demo_data.py      # or: npm run seed
+python scripts/connect_google.py     # or: npm run connect-google
+python scripts/diagnose.py           # or: npm run diagnose
+
+# Tests
+.\venv\Scripts\python.exe -m pytest
+```
+
 ## Summary
 
 Student Life OS is a practical local-first assistant for students. It is designed to be useful, privacy-respecting, and implementable by a small hackathon team without unnecessary infrastructure complexity. The system deliberately keeps the LLM in a constrained reasoning role and places business rules, validation, and security in the backend.

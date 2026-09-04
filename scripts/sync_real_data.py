@@ -8,7 +8,7 @@ import asyncio
 from pathlib import Path
 from datetime import datetime, timezone
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR / "backend"))
 sys.path.insert(0, str(ROOT_DIR))
 
@@ -180,6 +180,18 @@ async def main():
         print(f"  -> Extracted & Created Tasks from Gmail: {tasks_created}")
         print(f"  -> Extracted & Saved Opportunities from Gmail: {opportunities_created}")
 
+        # 5. Synchronize LeetCode & DSA Progress
+        print("\n[5/5] Synchronizing LeetCode & DSA progress...")
+        try:
+            from app.services.leetcode_watcher_service import leetcode_watcher_service
+            from app.services.dsa_service import DSAService
+            leetcode_res = await leetcode_watcher_service.check_user_leetcode_updates(db, user.id)
+            DSAService.sync_progress(db, user.id)
+            print(f"  -> LeetCode Sync Status: {leetcode_res.get('status')}")
+            print(f"  -> Total LeetCode Solved: {leetcode_res.get('total_solved', 0)}")
+        except Exception as lc_err:
+            print(f"  -> LeetCode sync notice: {lc_err}")
+
         # Summary
         print("\n==================================================")
         print(" [SUCCESS] System Updated with Real Data!")
@@ -188,6 +200,7 @@ async def main():
         print(f" Local Calendar Events: {db.query(CalendarEvent).filter(CalendarEvent.user_id == user.id).count()}")
         print(f" Active Tasks: {db.query(Task).filter(Task.user_id == user.id).count()}")
         print(f" Opportunities: {db.query(Opportunity).filter(Opportunity.user_id == user.id).count()}")
+        print(f" DSA Problems: {db.query(DSAProblem).filter(DSAProblem.user_id == user.id).count()}")
         print("==================================================")
 
     finally:

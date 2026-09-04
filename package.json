@@ -8,6 +8,10 @@
     "build": "npm --prefix frontend run build",
     "preview": "npm --prefix frontend run preview",
     "lint": "npm --prefix frontend run lint",
-    "start": "python start.py"
+    "start": "python start.py",
+    "seed": "python scripts/seed_demo_data.py",
+    "connect-google": "python scripts/connect_google.py",
+    "diagnose": "python scripts/diagnose.py",
+    "sync-real": "python scripts/sync_real_data.py"
   }
 }
