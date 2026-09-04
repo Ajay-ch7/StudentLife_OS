@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,9 +16,31 @@ from app.models.approval_request import ApprovalRequest
 from app.services.briefing_service import BriefingService
 from app.services.gemini_service import GeminiService
 from app.services.approval_service import ApprovalService
+from app.services.featherless_service import FeatherlessService
+from app.services.decision_context_service import DecisionContextService
 from openclaw.tools.registry import OpenClawToolBridge
 
 logger = logging.getLogger(__name__)
+
+
+def is_explanation_request(text: str) -> bool:
+    """Detect if the user is asking for an elaboration, detailed explanation, or reason for an AI decision."""
+    clean = text.strip().lower()
+    if clean in ("why", "why?", "explain", "elaborate", "why so?", "how come?", "/why", "/explain"):
+        return True
+
+    explanation_triggers = [
+        r"\bwhy\s+did\s+you\b",
+        r"\bwhy\s+was\s+(this|that|the|my)\b",
+        r"\bwhy\s+is\s+(this|that|the|my)\b",
+        r"\bexplain\s+(why|the\s+reason|your\s+decision|the\s+decision|this\s+decision|that\s+decision|your\s+reasoning)\b",
+        r"\b(can\s+you\s+)?elaborate\s+on\b",
+        r"\bwhat\s+(is|was)\s+the\s+reason\s+for\b",
+        r"\bwhy\s+(was\s+)?(priority|deadline|status|event|task)\b",
+        r"\bexplain\s+(last\s+decision|recent\s+decision)\b",
+        r"\bwhy\s+reschedule\b",
+    ]
+    return any(re.search(p, clean) for p in explanation_triggers)
 
 
 class TelegramBotListener:
@@ -32,6 +55,7 @@ class TelegramBotListener:
         self.last_update_id = 0
         self.tool_bridge = OpenClawToolBridge()
         self.gemini = GeminiService()
+        self.featherless = FeatherlessService()
         self.briefing_service = BriefingService()
 
     @property
@@ -85,8 +109,18 @@ class TelegramBotListener:
                 "🌅 Daily Briefing & Tasks:\n"
                 "• /briefing - Get today's morning briefing\n"
                 "• /tasks - View pending academic tasks\n\n"
+                "🧠 Model Decision Transparency:\n"
+                "• /explain or /why - Get an elaborated explanation of why an autonomous decision was made (powered by Featherless AI)\n\n"
                 "💡 You can also ask me anything in plain English (e.g., 'Check my emails for any assignments')!"
             )
+
+        if cmd in ("/explain", "/why"):
+            query_arg = " ".join(args) if args else None
+            ctx = DecisionContextService.get_relevant_decision(user_id, db, query=query_arg)
+            if not ctx:
+                return "ℹ️ No recent autonomous decisions found to explain."
+            explanation = await self.featherless.explain_decision(ctx, user_query=query_arg)
+            return f"🤖 *Decision Explanation (via Featherless AI)*:\n\n{explanation}"
 
         if cmd == "/briefing":
             briefing = await self.briefing_service.generate_briefing(db, user_id=user_id, send_notification=False)
@@ -265,8 +299,18 @@ class TelegramBotListener:
     async def handle_natural_language(self, text: str, user_id: int, db: Session) -> str:
         """
         Use Gemini reasoning to parse user intent and execute safe tools via OpenClaw.
-        Grounds Gemini with live database context to prevent hallucinations.
+        If the user explicitly asks for an elaboration, detailed explanation, or why a decision was made,
+        generates the explanation strictly via Featherless AI (bypassing Gemini).
         """
+        # 1. On-demand model-decision explanation via Featherless AI
+        if is_explanation_request(text):
+            ctx = DecisionContextService.get_relevant_decision(user_id, db, query=text)
+            if not ctx:
+                return "ℹ️ I couldn't find a recent autonomous decision to explain. If you have a specific task or email in mind, please mention it!"
+            explanation = await self.featherless.explain_decision(ctx, user_query=text)
+            return f"🤖 *Decision Explanation (via Featherless AI)*:\n\n{explanation}"
+
+        # 2. Normal conversational reasoning and tool execution via Gemini
         now = datetime.now().astimezone()
         now_str = now.strftime("%A, %B %d, %Y at %I:%M %p")
 

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     leetcode_username: str = "leetcode_demo"
     leetcode_poll_interval_seconds: int = 60
     leetcode_enabled: bool = True
+    featherless_api_key: str = "changeme"
+    featherless_model: str = "Qwen/Qwen2.5-1.5B-Instruct"
+    featherless_api_url: str = "https://api.featherless.ai/v1/chat/completions"
+    featherless_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

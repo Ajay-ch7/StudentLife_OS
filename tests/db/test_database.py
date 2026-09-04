@@ -16,6 +16,7 @@ def test_schema_contains_phase_one_tables() -> None:
     Base.metadata.create_all(engine)
 
     assert set(inspect(engine).get_table_names()) == {
+        "active_job_pipeline",
         "activity_logs",
         "agent_actions",
         "approval_requests",

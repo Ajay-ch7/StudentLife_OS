@@ -81,3 +81,162 @@ def submit_application(application_id: int, user_id: int = Depends(get_current_u
     application.status = "awaiting_approval"
     db.commit()
     return {"status": "approval_required", "approval_request_id": request.id, "application_id": application.id}
+
+
+# ==========================================
+# Autonomous Job Pipeline & SOP Endpoints
+# ==========================================
+
+@router.post("/jobs/pipeline/process")
+async def process_job_pipeline(
+    payload: dict[str, Any],
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    Autonomous Job Agent pipeline entrypoint.
+    Parses JD -> Matches DSA role tab -> Computes readiness -> Branches on threshold ->
+    Generates tailored SOP draft -> Logs to activity_log -> Saves in active_job_pipeline.
+    """
+    from app.schemas.job_schemas import JobProcessInput
+    from app.services.job_agent_service import job_agent_service
+
+    job_input = JobProcessInput(
+        job_text=payload.get("job_text", ""),
+        company=payload.get("company"),
+        title=payload.get("title"),
+        tone_preference=payload.get("tone_preference", "formal"),
+        specific_points=payload.get("specific_points"),
+        source=payload.get("source", "manual"),
+        url=payload.get("url"),
+    )
+    item = await job_agent_service.process_job_posting(db, user_id, job_input)
+
+    return _format_job_response(item)
+
+
+@router.get("/jobs/pipeline")
+def list_job_pipeline(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """List all active job pipeline postings with match %, readiness %, and SOP status."""
+    from app.services.job_agent_service import job_agent_service
+
+    jobs = job_agent_service.list_jobs(db, user_id)
+    return [_format_job_response(j) for j in jobs]
+
+
+@router.get("/jobs/pipeline/{job_id}")
+def get_job_pipeline_item(
+    job_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Retrieve full details of an active job pipeline posting including SOP and explainability fields."""
+    from app.services.job_agent_service import job_agent_service
+
+    item = job_agent_service.get_job(db, user_id, job_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Job pipeline item not found")
+    return _format_job_response(item)
+
+
+@router.put("/jobs/pipeline/{job_id}/sop")
+def update_sop_draft(
+    job_id: int,
+    payload: dict[str, Any],
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Student review and edit of the Statement of Purpose draft."""
+    from app.schemas.job_schemas import UpdateSOPInput
+    from app.services.job_agent_service import job_agent_service
+
+    sop_input = UpdateSOPInput(
+        sop_draft=payload.get("sop_draft", ""),
+        sop_status=payload.get("sop_status", "reviewed"),
+    )
+    item = job_agent_service.update_sop_draft(db, user_id, job_id, sop_input)
+    return _format_job_response(item)
+
+
+@router.post("/jobs/pipeline/{job_id}/regenerate-sop")
+async def regenerate_sop_draft(
+    job_id: int,
+    payload: dict[str, Any] | None = None,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Regenerate SOP draft with updated tone or student custom notes."""
+    from app.schemas.job_schemas import RegenerateSOPInput
+    from app.services.job_agent_service import job_agent_service
+
+    payload = payload or {}
+    regen_input = RegenerateSOPInput(
+        tone_preference=payload.get("tone_preference"),
+        specific_points=payload.get("specific_points"),
+    )
+    item = await job_agent_service.regenerate_sop(db, user_id, job_id, regen_input)
+    return _format_job_response(item)
+
+
+@router.get("/jobs/activity")
+def get_jobs_activity_log(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Retrieve recent career & job agent activity logs for the live demo feed."""
+    from app.models.activity_log import ActivityLog
+
+    career_types = [
+        "job_parsed", "role_matched", "readiness_computed",
+        "sop_generated", "job_discarded", "dsa_priority_task_queued",
+        "sop_regenerated", "sop_edited",
+    ]
+    logs = (
+        db.query(ActivityLog)
+        .filter(ActivityLog.user_id == user_id, ActivityLog.activity_type.in_(career_types))
+        .order_by(ActivityLog.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    return [
+        {
+            "id": log.id,
+            "activity_type": log.activity_type,
+            "message": log.message,
+            "metadata": json.loads(log.metadata_json) if log.metadata_json else {},
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]
+
+
+def _format_job_response(item: Any) -> dict[str, Any]:
+    """Helper to convert ActiveJobPipeline model to standardized JSON structure."""
+    return {
+        "id": item.id,
+        "user_id": item.user_id,
+        "title": item.title,
+        "company": item.company,
+        "description": item.description,
+        "source": item.source,
+        "url": item.url,
+        "match_score": item.match_score,
+        "readiness_score": item.readiness_score,
+        "role_match": item.role_match,
+        "matched_role": item.matched_role,
+        "technical_strengths": json.loads(item.technical_strengths) if item.technical_strengths else [],
+        "developing_topics": json.loads(item.developing_topics) if item.developing_topics else [],
+        "sop_draft": item.sop_draft,
+        "sop_status": item.sop_status,
+        "sop_generated_from": json.loads(item.sop_generated_from) if item.sop_generated_from else [],
+        "student_preferences": json.loads(item.student_preferences) if item.student_preferences else {},
+        "experience_level": item.experience_level,
+        "responsibilities": json.loads(item.responsibilities) if item.responsibilities else [],
+        "company_values": item.company_values,
+        "deadline": item.deadline,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+    }
