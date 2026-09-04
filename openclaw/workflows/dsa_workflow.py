@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.integrations.telegram_adapter import TelegramAdapter
+from app.schemas.orchestration_schemas import OrchestratorEvent, OrchestratorEventType
 from app.services.dsa_service import DSAService
 from app.services.gemini_service import GeminiService
+from app.services.orchestrator import multi_agent_orchestrator
 from openclaw.workflows.base_workflow import BaseWorkflow
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,18 @@ class DSARecommendationWorkflow(BaseWorkflow):
         newly_solved = data.get("newly_solved", [])
         total_solved = data.get("total_solved")
         username = data.get("username")
+
+        # Orchestrator intercept: cross-agent context on new LeetCode solve
+        try:
+            orch_event = OrchestratorEvent(
+                event_type=OrchestratorEventType.NEW_LEETCODE_SOLVE,
+                user_id=user_id,
+                payload={"newly_solved": newly_solved, "username": username},
+                workflow_id=f"orch-dsa-{workflow_id}",
+            )
+            await multi_agent_orchestrator.run(orch_event, db)
+        except Exception as orch_exc:
+            logger.warning("Orchestrator intercept failed in DSA workflow (fallback): %s", orch_exc)
 
         # Get existing DSA summary
         summary = DSAService.summary(db, user_id)

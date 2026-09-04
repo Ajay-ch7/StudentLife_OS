@@ -427,3 +427,57 @@ RETURN ONLY A VALID JSON OBJECT matching this schema:
 }}"""
 
 
+
+def build_orchestrated_reasoning_prompt(event: dict, merged_context: dict) -> str:
+    """Build the single merged cross-agent reasoning prompt for the Orchestrator Gemini call."""
+    import json as _json
+
+    event_type = event.get("event_type", "unknown")
+    payload = event.get("payload", {})
+    payload_str = _json.dumps(payload, indent=2, default=str)
+
+    sections: list[str] = []
+    sections.append(
+        "You are the OpenClaw Multi-Agent Orchestrator for StudentLife OS.\n"
+        "An event has occurred that may affect multiple agents. You have been given\n"
+        "the complete, live context from all relevant agents. Reason across ALL agents\n"
+        "before deciding what each one should do.\n"
+    )
+    sections.append(f"== EVENT ==\nType: {event_type}\nPayload: {payload_str}\n")
+
+    for agent_name, context in merged_context.items():
+        if context is None:
+            sections.append(f"== {agent_name.upper()} AGENT CONTEXT ==\n[SKIPPED — not relevant to this event]\n")
+        else:
+            ctx_str = _json.dumps(context, indent=2, default=str)
+            sections.append(f"== {agent_name.upper()} AGENT CONTEXT ==\n{ctx_str}\n")
+
+    sections.append(
+        "INSTRUCTIONS:\n"
+        "1. Do NOT make decisions for a single agent in isolation.\n"
+        "2. Consider all provided contexts before generating agent_actions.\n"
+        "3. HIGH-PRIORITY COMMITMENTS & CALENDAR CONFLICT RESOLUTION (Interviews, Exams, Hard Deadlines):\n"
+        "   - High-priority events (interviews, exams, recruiter assessments) must NEVER be missed.\n"
+        "   - When an incoming event is an interview or high-priority commitment:\n"
+        "     * Generate a [MANAGEMENT] add_event action to schedule the interview.\n"
+        "     * If it conflicts with an existing low-priority learning plan or study block (as shown in 'incoming_interview_conflicts' or 'shiftable_low_priority_events'):\n"
+        "       You MUST ALSO generate a [MANAGEMENT] reschedule_event action shifting the clashing learning plan to the candidate free day/slot (recommended_new_start).\n"
+        "     * DO NOT delete learning plans; always shift them to available free days so the student maintains their learning streak without compromising high-priority commitments.\n"
+        "     * In 'reasoning' and 'telegram_summary', explicitly state that a conflict was detected with the specific learning plan and that you propose shifting it to the candidate free day.\n"
+        "4. TELEGRAM APPROVAL GATE: All high-impact and rescheduling plans will be sent to the student via Telegram with full conflict details for explicit confirmation (/approve <id> or /reject <id>) before execution.\n"
+        "5. Preserve the student's DSA streak wherever possible.\n"
+        "6. If a conflict is unresolvable, escalate with a Telegram alert and request approval.\n"
+        "7. Return ONLY valid JSON matching the OrchestratedDecision schema:\n"
+        '{\n'
+        '  "reasoning": "A clear multi-line explanation referencing all agent contexts",\n'
+        '  "priority_override": "urgent | high | medium | low | null",\n'
+        '  "agent_actions": [\n'
+        '    {"agent": "inbox|management|dsa|job", "action": "...", "parameters": {}, "rationale": "..."}\n'
+        '  ],\n'
+        '  "skip_agents": ["agent_name"],\n'
+        '  "skip_reason": "why these agents were skipped or null",\n'
+        '  "telegram_summary": "Short 1-2 sentence summary to send to student"\n'
+        '}'
+    )
+
+    return "\n\n".join(sections)

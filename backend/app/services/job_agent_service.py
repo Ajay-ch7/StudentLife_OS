@@ -26,6 +26,48 @@ class JobAgentService:
     def __init__(self, gemini_service: GeminiService | None = None) -> None:
         self.gemini = gemini_service or GeminiService()
 
+    @staticmethod
+    def get_context_snapshot(db: Session, user_id: int) -> dict[str, Any]:
+        """Read-only Job Agent context snapshot for the Orchestrator. No writes."""
+        pipelines = (
+            db.query(ActiveJobPipeline)
+            .filter(ActiveJobPipeline.user_id == user_id)
+            .order_by(ActiveJobPipeline.id.desc())
+            .limit(10)
+            .all()
+        )
+        active_pipelines = [
+            {
+                "company": p.company,
+                "title": p.title,
+                "match_score": p.match_score,
+                "readiness_score": p.readiness_score,
+                "sop_status": p.sop_status,
+                "role_match": p.role_match,
+            }
+            for p in pipelines
+        ]
+        pending_applications = sum(1 for p in pipelines if p.sop_status in ("drafted", "pending"))
+
+        # Collect all developing/weak topics across pipelines
+        weak_set: set[str] = set()
+        for p in pipelines:
+            if p.developing_topics:
+                import json as _json
+                try:
+                    topics = _json.loads(p.developing_topics)
+                    if isinstance(topics, list):
+                        weak_set.update(topics)
+                except Exception:
+                    pass
+        weak_topics_across_roles = list(weak_set)[:5]
+
+        return {
+            "active_pipelines": active_pipelines,
+            "pending_applications": pending_applications,
+            "weak_topics_across_roles": weak_topics_across_roles,
+        }
+
     async def process_job_posting(
         self,
         db: Session,

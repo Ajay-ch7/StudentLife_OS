@@ -38,12 +38,14 @@ def briefing_test_db():
 
     now = datetime.now(timezone.utc)
 
+    today_noon = now.replace(hour=12, minute=0, second=0, microsecond=0)
+
     # 1. Today's calendar event
     event = CalendarEvent(
         user_id=user.id,
         title="CS186 Database Systems Lecture",
-        starts_at=now + timedelta(hours=2),
-        ends_at=now + timedelta(hours=3, minutes=30),
+        starts_at=today_noon,
+        ends_at=today_noon + timedelta(hours=1, minutes=30),
     )
     session.add(event)
 

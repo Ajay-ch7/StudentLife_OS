@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, inbox, opportunities, profile, resources, tasks, tools
+from app.api.v1 import academic, agent, approvals, briefing, calendar, dsa, inbox, opportunities, orchestrator, profile, resources, tasks, tools
 from app.core.config import ensure_data_directories, get_settings
 from app.core.exceptions import unhandled_exception_handler
 from app.core.logging import configure_logging
@@ -82,6 +82,7 @@ app.include_router(academic.router, prefix="/api/v1")
 app.include_router(opportunities.router, prefix="/api/v1")
 app.include_router(dsa.router, prefix="/api/v1")
 app.include_router(resources.router, prefix="/api/v1")
+app.include_router(orchestrator.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

@@ -107,6 +107,11 @@ def init_db() -> None:
 					if column not in job_columns:
 						connection.execute(text(f"ALTER TABLE active_job_pipeline ADD COLUMN {column} {column_type}"))
 
+			# Migrate activity_logs table — add orchestration_id for cross-agent correlation
+			activity_log_columns = {column["name"] for column in inspect(connection).get_columns("activity_logs")}
+			if "orchestration_id" not in activity_log_columns:
+				connection.execute(text("ALTER TABLE activity_logs ADD COLUMN orchestration_id VARCHAR(50)"))
+
 
 def get_db() -> Generator:
 	db = SessionLocal()

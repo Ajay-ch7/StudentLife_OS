@@ -53,6 +53,10 @@ async def approve(request_id: int, payload: ApprovalAction, user_id: int = Depen
             approved=True,
         )
         ApprovalService.record_result(db, request, result.model_dump())
+    elif request.action_type == "orchestrated_plan":
+        from app.services.orchestrator import multi_agent_orchestrator
+        exec_results = await multi_agent_orchestrator.execute_approved_plan(db, user_id, request)
+        ApprovalService.record_result(db, request, {"status": "executed", "results": exec_results})
     elif request.action_type == "submit_application":
         metadata = json.loads(request.metadata_json) if request.metadata_json else {}
         application = db.query(Application).filter(

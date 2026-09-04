@@ -94,7 +94,75 @@ class DSAService:
         }
 
     @staticmethod
+    def get_context_snapshot(db: Session, user_id: int) -> dict:
+        """Read-only DSA context snapshot for the Orchestrator. No writes."""
+        from app.models.calendar_event import CalendarEvent
+        summary = DSAService.summary(db, user_id)
+        weak_topics = summary.get("weak_topics", [])
+        streak = summary.get("streak", 0)
+        total = summary.get("total", 0)
+
+        # Active DSA tasks from tasks table
+        from app.models.task import Task
+        active_dsa_tasks = (
+            db.query(Task)
+            .filter(Task.user_id == user_id, Task.category == "dsa", Task.status == "pending")
+            .order_by(Task.deadline.asc().nullslast())
+            .limit(5)
+            .all()
+        )
+        active_dsa_tasks_data = [
+            {"id": t.id, "title": t.title, "priority": t.priority, "deadline": t.deadline.isoformat() if t.deadline else None}
+            for t in active_dsa_tasks
+        ]
+
+        # Scheduled DSA calendar sessions
+        scheduled_sessions = (
+            db.query(CalendarEvent)
+            .filter(
+                CalendarEvent.user_id == user_id,
+                CalendarEvent.title.ilike("%DSA%"),
+            )
+            .order_by(CalendarEvent.starts_at.asc())
+            .limit(5)
+            .all()
+        )
+        scheduled_sessions_data = [
+            {"id": e.id, "title": e.title, "starts_at": e.starts_at.isoformat(), "ends_at": e.ends_at.isoformat()}
+            for e in scheduled_sessions
+        ]
+
+        # Job application readiness from dsa_progress
+        from app.services.dsa_role_requirements import match_role_tab, compute_role_readiness
+        readiness_entries = []
+        from app.models.application import Application
+        applications = db.query(Application).filter(Application.user_id == user_id).limit(5).all()
+        for app_obj in applications:
+            opp = app_obj.opportunity if hasattr(app_obj, "opportunity") else None
+            role_title = getattr(opp, "role_title", "") if opp else ""
+            if role_title:
+                role_info = match_role_tab(role_title)
+                readiness = compute_role_readiness(db, user_id, role_info["topics"])
+                readiness_entries.append({
+                    "role": role_title,
+                    "readiness_score": readiness["readiness_score"],
+                    "weak_topics": readiness["developing_topics"],
+                })
+
+        return {
+            "dsa_summary": {
+                "total": total,
+                "streak": streak,
+                "weak_topics": weak_topics,
+            },
+            "job_application_readiness": readiness_entries,
+            "scheduled_dsa_sessions": scheduled_sessions_data,
+            "active_dsa_tasks": active_dsa_tasks_data,
+        }
+
+    @staticmethod
     def sync_progress(db: Session, user_id: int) -> None:
+
         items = db.query(DSAProblem).filter(DSAProblem.user_id == user_id).all()
         grouped: dict[str, list[DSAProblem]] = {}
         for item in items:

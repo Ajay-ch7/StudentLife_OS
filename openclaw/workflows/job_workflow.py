@@ -3,7 +3,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.schemas.job_schemas import JobProcessInput
+from app.schemas.orchestration_schemas import OrchestratorEvent, OrchestratorEventType
 from app.services.job_agent_service import job_agent_service
+from app.services.orchestrator import multi_agent_orchestrator
 from openclaw.workflows.base_workflow import BaseWorkflow
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,18 @@ class AutonomousJobWorkflow(BaseWorkflow):
             source=payload.get("source", "openclaw_agent"),
             url=payload.get("url"),
         )
+
+        # Orchestrator intercept: cross-agent context before job posting
+        try:
+            orch_event = OrchestratorEvent(
+                event_type=OrchestratorEventType.NEW_JOB_POSTING,
+                user_id=user_id,
+                payload={"job_text": job_text, "company": payload.get("company"), "title": payload.get("title")},
+                workflow_id=f"orch-job-{workflow_id}",
+            )
+            await multi_agent_orchestrator.run(orch_event, db)
+        except Exception as orch_exc:
+            logger.warning("Orchestrator intercept failed in Job workflow (fallback): %s", orch_exc)
 
         job_record = await job_agent_service.process_job_posting(db, user_id, job_input)
 
