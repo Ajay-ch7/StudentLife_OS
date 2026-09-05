@@ -242,37 +242,42 @@ These are never trusted as instructions and must be validated before use.
 student-life-os/
 ├── frontend/
 │   ├── src/
-│   ├── public/
+│   ├── index.html
 │   └── package.json
 ├── backend/
-│   ├── api/
-│   ├── models/
-│   ├── services/
-│   ├── integrations/
-│   ├── tools/
-│   ├── workflows/
-│   ├── app/
 │   └── app/
+│       ├── api/v1/
+│       ├── core/
+│       ├── db/
+│       ├── integrations/
+│       ├── models/
+│       ├── repositories/
+│       ├── schemas/
+│       ├── services/
+│       ├── tools/
+│       └── workflows/
 ├── openclaw/
 │   ├── agent/
 │   ├── workflows/
 │   └── tools/
+├── scripts/
+│   └── manual/
 ├── data/
 │   ├── sqlite/
 │   └── uploads/
 ├── tests/
-│   ├── api/
+│   ├── agent/
 │   ├── db/
+│   ├── integrations/
+│   ├── services/
 │   ├── tools/
 │   └── workflows/
-├── ARCHITECTURE.md
 ├── README.md
-├── IMPLEMENTATION_PLAN.md
-├── .env.example
+├── pyproject.toml
 ├── requirements.txt
+├── package.json
 ├── start.py
-├── .gitignore
-└── Makefile
+└── .gitignore
 ```
 
 ---
@@ -306,7 +311,7 @@ npm install
 
 ## Environment Variables
 
-Create a local `.env` file based on `.env.example`.
+Create a local `.env` file in the repository root.
 
 ```env
 GEMINI_API_KEY=your_gemini_key_here
@@ -458,6 +463,8 @@ cd frontend && npm run dev
 python scripts/seed_demo_data.py      # or: npm run seed
 python scripts/connect_google.py     # or: npm run connect-google
 python scripts/diagnose.py           # or: npm run diagnose
+
+# Manual integration and diagnostic scripts live in scripts/manual/.
 
 # Tests
 .\venv\Scripts\python.exe -m pytest

@@ -14,6 +14,9 @@ node_modules/
 dist/
 build/
 .npm/
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/tsconfig.*.tsbuildinfo
 credentials.json
 client_secrets*.json
 *token*.json
