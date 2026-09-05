@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -14,6 +15,7 @@ from app.db.database import SessionLocal
 from app.models.calendar_event import CalendarEvent
 from app.models.task import Task
 from app.models.approval_request import ApprovalRequest
+from app.models.telegram_alert_delivery import TelegramAlertDelivery
 from app.services.briefing_service import BriefingService
 from app.services.gemini_service import GeminiService
 from app.services.approval_service import ApprovalService
@@ -88,20 +90,68 @@ class TelegramBotListener:
     def is_configured(self) -> bool:
         return bool(self.token and not self.settings.telegram_mock_mode)
 
-    async def send_reply(self, chat_id: str | int, text: str) -> None:
+    async def send_reply(self, chat_id: str | int, text: str) -> bool:
         """Send a message back to Telegram."""
         if not self.token:
-            return
+            return False
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                await client.post(url, json={"chat_id": str(chat_id), "text": text})
+                response = await client.post(url, json={"chat_id": str(chat_id), "text": text})
+                response.raise_for_status()
         except Exception as e:
             logger.error("Failed to send Telegram reply: %s", e)
+            return False
+        return True
 
-    async def send_message(self, chat_id: str | int, text: str) -> None:
+    async def send_message(self, chat_id: str | int, text: str) -> bool:
         """Proactively send a message to the student via Telegram."""
-        await self.send_reply(chat_id=chat_id, text=text)
+        return await self.send_reply(chat_id=chat_id, text=text)
+
+    async def send_alert(
+        self,
+        db: Session,
+        chat_id: str | int,
+        text: str,
+        alert_key: str,
+    ) -> bool:
+        """Deliver an autonomous alert once for this recipient and content version."""
+        resolved_chat_id = str(chat_id)
+        content_hash = hashlib.sha256(f"{alert_key}\0{text}".encode("utf-8")).hexdigest()
+        existing = (
+            db.query(TelegramAlertDelivery)
+            .filter(
+                TelegramAlertDelivery.chat_id == resolved_chat_id,
+                TelegramAlertDelivery.content_hash == content_hash,
+            )
+            .first()
+        )
+        if existing:
+            return False
+
+        delivered = await self.send_message(chat_id=resolved_chat_id, text=text)
+        if not delivered:
+            return False
+
+        db.add(
+            TelegramAlertDelivery(
+                chat_id=resolved_chat_id,
+                alert_key=alert_key,
+                content_hash=content_hash,
+                text=text,
+            )
+        )
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            if db.query(TelegramAlertDelivery).filter(
+                TelegramAlertDelivery.chat_id == resolved_chat_id,
+                TelegramAlertDelivery.content_hash == content_hash,
+            ).first():
+                return False
+            raise
+        return True
 
     async def generate_schedule_shift_proposal(self, user_id: int, db: Session) -> str:
         """

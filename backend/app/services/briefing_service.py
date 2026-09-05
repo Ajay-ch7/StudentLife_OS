@@ -77,7 +77,7 @@ class BriefingService:
         )
 
         return {
-            "student_name": user.full_name if user else "Student",
+            "student_name": user.full_name if user and user.full_name else "",
             "profile": profile,
             "tasks": [
                 {
@@ -124,14 +124,17 @@ class BriefingService:
             profile=context["profile"],
             tasks=context["tasks"],
             calendar_events=context["calendar_events"],
+            urgent_deadlines=context["urgent_deadlines"],
         )
 
         # 2. Format plain text for notification
         formatted_message = (
             f"🌅 {briefing.greeting}\n\n"
-            f"💡 Mindset: \"{briefing.quote_or_motto or 'Focus on what matters.'}\"\n\n"
-            f"🎯 Top Priorities Today:\n" + "\n".join(f"• {p}" for p in briefing.top_priorities) + "\n\n"
-            f"📅 Today's Timeline:\n{briefing.schedule_overview}"
+            + (f"💡 Mindset: \"{briefing.quote_or_motto}\"\n\n" if briefing.quote_or_motto else "")
+            + f"🎯 Top Priorities Today:\n"
+            + ("\n".join(f"• {p}" for p in briefing.top_priorities) or "")
+            + "\n\n"
+            + f"📅 Today's Timeline:\n{briefing.schedule_overview}"
         )
         if briefing.urgent_alerts:
             formatted_message += "\n\n⚠️ Upcoming Cutoffs:\n" + "\n".join(f"• {a}" for a in briefing.urgent_alerts)

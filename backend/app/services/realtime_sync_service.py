@@ -158,8 +158,14 @@ class RealtimeSyncService:
 
                 if target_chat_id:
                     try:
-                        await self.telegram.send_message(chat_id=target_chat_id, text=alert_text)
-                        logger.info("Delivered Telegram alert for new calendar event '%s'", event.title)
+                        delivered = await self.telegram.send_alert(
+                            db=db,
+                            chat_id=target_chat_id,
+                            text=alert_text,
+                            alert_key=f"calendar_event_created:{event.id}",
+                        )
+                        if delivered:
+                            logger.info("Delivered Telegram alert for new calendar event '%s'", event.title)
                     except Exception as err:
                         logger.warning("Could not dispatch calendar event alert to Telegram: %s", err)
 
@@ -230,9 +236,15 @@ class RealtimeSyncService:
                 )
 
                 try:
-                    await self.telegram.send_message(chat_id=target_chat_id, text=reminder_text)
-                    logger.info("Sent day-before reminder for event '%s' to %s", event.title, target_chat_id)
-                    reminders_sent += 1
+                    delivered = await self.telegram.send_alert(
+                        db=db,
+                        chat_id=target_chat_id,
+                        text=reminder_text,
+                        alert_key=f"calendar_event_reminder:{event.id}",
+                    )
+                    if delivered:
+                        logger.info("Sent day-before reminder for event '%s' to %s", event.title, target_chat_id)
+                        reminders_sent += 1
                 except Exception as err:
                     logger.warning("Could not dispatch event reminder to Telegram: %s", err)
 

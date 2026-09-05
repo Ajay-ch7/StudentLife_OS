@@ -18,6 +18,7 @@ from app.models.approval_request import ApprovalRequest
 from app.models.calendar_event import CalendarEvent
 from app.models.student_profile import User
 from app.models.task import Task
+from app.schemas.orchestration_schemas import AgentActionItem
 from app.services.approval_service import ApprovalService
 from app.services.orchestrator import multi_agent_orchestrator
 from app.services.scheduling_service import (
@@ -268,3 +269,47 @@ def test_natural_language_intent_matching():
     assert is_schedule_shift_request("shift low priority study sessions to free days") is True
     assert is_schedule_shift_request("reschedule my learning plan to avoid interview clash") is True
     assert is_schedule_shift_request("what is the weather today?") is False
+
+
+@pytest.mark.asyncio
+async def test_google_calendar_failure_leaves_event_local_time_unchanged(db, monkeypatch):
+    session, user_id = db
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    event = CalendarEvent(
+        user_id=user_id,
+        google_event_id="google-event-123",
+        title="DSA Practice",
+        starts_at=now + timedelta(days=1),
+        ends_at=now + timedelta(days=1, hours=1),
+        event_type="study",
+    )
+    session.add(event)
+    session.commit()
+    original_start = event.starts_at
+    original_end = event.ends_at
+
+    monkeypatch.setattr(
+        "app.services.orchestrator.google_calendar_adapter.update_event",
+        lambda **kwargs: {"status": "failed", "error": "expired Google token"},
+    )
+
+    result = await multi_agent_orchestrator._dispatch_to_agent(
+        session,
+        user_id,
+        "test-google-reschedule",
+        AgentActionItem(
+            agent="management",
+            action="reschedule_event",
+            parameters={
+                "event_id": event.id,
+                "new_start": (now + timedelta(days=2)).isoformat(),
+                "new_end": (now + timedelta(days=2, hours=1)).isoformat(),
+            },
+        ),
+    )
+
+    assert result["status"] == "error"
+    assert "Google Calendar update failed" in result["error"]
+    session.refresh(event)
+    assert event.starts_at == original_start
+    assert event.ends_at == original_end

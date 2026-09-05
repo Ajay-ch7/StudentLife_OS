@@ -22,6 +22,7 @@ from app.models.study_material import StudyMaterial
 from app.models.study_plan import StudyPlan
 from app.models.study_session import StudySession
 from app.models.task import Task
+from app.models.telegram_alert_delivery import TelegramAlertDelivery
 
 __all__ = [
 	"Base",
@@ -48,4 +49,5 @@ __all__ = [
 	"StudyPlan",
 	"StudyMaterial",
 	"User",
+	"TelegramAlertDelivery",
 ]

@@ -6,12 +6,44 @@ from sqlalchemy.orm import sessionmaker
 from app.db.database import Base
 from app.models.student_profile import User
 from app.models.calendar_event import CalendarEvent
+from app.models.telegram_alert_delivery import TelegramAlertDelivery
 from app.models.task import Task
 from app.models.approval_request import ApprovalRequest
 from app.services.telegram_bot_listener import TelegramBotListener
 from app.integrations.google_calendar_adapter import GoogleCalendarAdapter
 from app.integrations.gmail_adapter import GmailAdapter
 from app.tools.tool_registry import tool_registry
+
+
+class FakeCalendarRequest:
+    def __init__(self, response):
+        self.response = response
+
+    def execute(self):
+        return self.response
+
+
+class FakeCalendarEvents:
+    def __init__(self, event):
+        self.event = event
+        self.updated = None
+
+    def get(self, **kwargs):
+        assert kwargs["calendarId"] == "primary"
+        assert kwargs["eventId"] == self.event["id"]
+        return FakeCalendarRequest(self.event.copy())
+
+    def update(self, **kwargs):
+        self.updated = kwargs
+        return FakeCalendarRequest(kwargs["body"])
+
+
+class FakeCalendarService:
+    def __init__(self, event):
+        self.events_resource = FakeCalendarEvents(event)
+
+    def events(self):
+        return self.events_resource
 
 
 @pytest.fixture
@@ -79,6 +111,37 @@ def test_google_adapters_graceful_fallback(monkeypatch):
     assert draft_res["mocked"] is True
 
 
+def test_google_calendar_update_preserves_existing_event_details():
+    original = {
+        "id": "google-event-123",
+        "summary": "Study block",
+        "description": "Keep this description",
+        "attendees": [{"email": "student@example.com"}],
+        "reminders": {"useDefault": False, "overrides": [{"method": "popup", "minutes": 10}]},
+        "start": {"dateTime": "2026-09-06T10:00:00+00:00"},
+        "end": {"dateTime": "2026-09-06T11:00:00+00:00"},
+    }
+    service = FakeCalendarService(original)
+    adapter = GoogleCalendarAdapter()
+    adapter._service = service
+
+    result = adapter.update_event(
+        event_id="google-event-123",
+        starts_at=datetime(2026, 9, 7, 10, tzinfo=timezone.utc),
+        ends_at=datetime(2026, 9, 7, 11, tzinfo=timezone.utc),
+    )
+
+    assert result["status"] == "success"
+    assert service.events_resource.updated["eventId"] == "google-event-123"
+    updated = service.events_resource.updated["body"]
+    assert updated["summary"] == original["summary"]
+    assert updated["description"] == original["description"]
+    assert updated["attendees"] == original["attendees"]
+    assert updated["reminders"] == original["reminders"]
+    assert updated["start"]["dateTime"] == "2026-09-07T10:00:00+00:00"
+    assert updated["end"]["dateTime"] == "2026-09-07T11:00:00+00:00"
+
+
 @pytest.mark.asyncio
 async def test_telegram_bot_commands(mock_db):
     session, user = mock_db
@@ -96,3 +159,23 @@ async def test_telegram_bot_commands(mock_db):
     # Test /drafts (empty)
     drafts_resp = await listener.handle_command("/drafts", user_id=user.id, db=session)
     assert "No pending approvals" in drafts_resp
+
+
+@pytest.mark.asyncio
+async def test_telegram_alert_is_persistent_and_content_sensitive(mock_db, monkeypatch):
+    session, user = mock_db
+    listener = TelegramBotListener()
+    sent = []
+
+    async def fake_send_message(chat_id, text):
+        sent.append((chat_id, text))
+        return True
+
+    monkeypatch.setattr(listener, "send_message", fake_send_message)
+
+    assert await listener.send_alert(session, "chat-1", "Event changed", "event:42") is True
+    assert await listener.send_alert(session, "chat-1", "Event changed", "event:42") is False
+    assert await listener.send_alert(session, "chat-1", "Event changed again", "event:42") is True
+
+    assert len(sent) == 2
+    assert session.query(TelegramAlertDelivery).count() == 2

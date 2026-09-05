@@ -113,6 +113,38 @@ class GoogleCalendarAdapter:
             logger.error("Failed to insert event into Google Calendar: %s", e)
             return {"status": "failed", "error": str(e)}
 
+    def update_event(
+        self,
+        event_id: str,
+        starts_at: datetime,
+        ends_at: datetime,
+        calendar_id: str = "primary",
+    ) -> dict[str, Any]:
+        """Move an existing Google Calendar event while preserving its details."""
+        if not self.is_connected():
+            return {"status": "failed", "error": "Google Calendar not connected"}
+
+        try:
+            event = self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+            event["start"] = {"dateTime": starts_at.isoformat()}
+            event["end"] = {"dateTime": ends_at.isoformat()}
+            updated = self.service.events().update(
+                calendarId=calendar_id,
+                eventId=event_id,
+                body=event,
+            ).execute()
+            logger.info("Successfully rescheduled Google Calendar event: %s", event_id)
+            return {
+                "status": "success",
+                "google_id": updated.get("id", event_id),
+                "html_link": updated.get("htmlLink"),
+                "starts_at": starts_at.isoformat(),
+                "ends_at": ends_at.isoformat(),
+            }
+        except Exception as e:
+            logger.error("Failed to reschedule Google Calendar event %s: %s", event_id, e)
+            return {"status": "failed", "error": str(e)}
+
     def delete_event(self, event_id: str, calendar_id: str = "primary") -> bool:
         """Delete an event from Google Calendar by its Google event ID."""
         if not self.is_connected():

@@ -261,22 +261,6 @@ class GeminiClient:
                 ],
             })
 
-        if "morning briefing" in prompt_lower:
-            return json.dumps({
-                "greeting": "Good morning! Here is your daily rhythm.",
-                "quote_or_motto": "Consistent daily execution compounds into remarkable mastery.",
-                "top_priorities": [
-                    "Finish DBMS Assignment questions 1-3",
-                    "Attend 2:00 PM Operating Systems Lecture",
-                    "Solve 1 DSA DP problem"
-                ],
-                "schedule_overview": "Light morning open window followed by 2:00 PM lecture and 5:00 PM study block.",
-                "urgent_alerts": [
-                    "DBMS Assignment due in 4 days"
-                ],
-                "recommended_recovery_action": None,
-            })
-
         if "classify its trust level" in prompt_lower or "classification" in prompt_lower:
             return json.dumps({
                 "trust_level": "untrusted",

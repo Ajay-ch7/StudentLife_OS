@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.integrations.google_calendar_adapter import GoogleCalendarAdapter
 from app.schemas.orchestration_schemas import (
     AgentActionItem,
     OrchestratedDecision,
@@ -27,9 +28,14 @@ from app.schemas.orchestration_schemas import (
 from app.services.audit_service import AuditService
 from app.services.gemini_service import GeminiService
 from app.services.prompt_builder import build_orchestrated_reasoning_prompt
-from app.services.scheduling_service import check_incoming_event_conflicts, normalize_datetime
+from app.services.scheduling_service import (
+    check_incoming_event_conflicts,
+    conflict_reasons,
+    normalize_datetime,
+)
 
 logger = logging.getLogger(__name__)
+google_calendar_adapter = GoogleCalendarAdapter()
 
 # --------------------------------------------------------------------------
 # Event → Agent routing table (matches spec exactly)
@@ -373,6 +379,36 @@ class MultiAgentOrchestrator:
                         description=event.description,
                         task_id=event.task_id,
                     )
+                    reasons = conflict_reasons(
+                        db,
+                        event.user_id,
+                        new_start,
+                        new_end,
+                        exclude_event_id=event.id,
+                        task_id=event.task_id,
+                    )
+                    if reasons:
+                        result["status"] = "error"
+                        result["error"] = "; ".join(reasons)
+                        return result
+                    if event.google_event_id:
+                        google_result = google_calendar_adapter.update_event(
+                            event_id=event.google_event_id,
+                            starts_at=new_start,
+                            ends_at=new_end,
+                        )
+                        if google_result.get("status") != "success":
+                            logger.error(
+                                "Google Calendar reschedule failed for local event %s: %s",
+                                event.id,
+                                google_result.get("error", "unknown error"),
+                            )
+                            result["status"] = "error"
+                            result["error"] = (
+                                f"Google Calendar update failed for event '{event.title}': "
+                                f"{google_result.get('error', 'unknown error')}"
+                            )
+                            return result
                     update_event(db, event, payload_update)
                     result["event_id"] = event.id
                     result["event_title"] = event.title

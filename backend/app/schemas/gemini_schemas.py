@@ -55,7 +55,7 @@ class OpportunitySkillAnalysis(BaseModel):
 class MorningBriefingResult(BaseModel):
     greeting: str = Field(..., description="Personalized greeting")
     quote_or_motto: str | None = Field(None, description="Short encouraging message")
-    top_priorities: list[str] = Field(..., min_length=1, description="Top 2-4 tasks/goals for today")
+    top_priorities: list[str] = Field(default_factory=list, description="Tasks explicitly present in the student's workspace")
     schedule_overview: str = Field(..., description="Overview of the day's timeline and calendar")
     urgent_alerts: list[str] = Field(default_factory=list, description="Upcoming deadlines in next 48h")
     recommended_recovery_action: str | None = Field(None, description="Action if behind schedule or facing conflicts")

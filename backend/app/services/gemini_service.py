@@ -83,15 +83,26 @@ class GeminiService:
         profile: Any,
         tasks: list[dict[str, Any]],
         calendar_events: list[dict[str, Any]],
+        urgent_deadlines: list[dict[str, Any]] | None = None,
     ) -> MorningBriefingResult:
-        """Generate a focused morning briefing summary for the day."""
-        profile_context = build_minimal_profile_context(profile)
-        prompt = build_morning_briefing_prompt(student_name, profile_context, tasks, calendar_events)
-        raw_json = await self.client.generate_json(
-            prompt=prompt,
-            system_instruction="You are the Student Life OS assistant. Return only concise, high-impact morning briefings in valid JSON.",
+        """Build a briefing strictly from records already present in the workspace."""
+        deadlines = urgent_deadlines or []
+        schedule_items = [
+            f"{event['title']} ({event['starts_at']} - {event['ends_at']})"
+            for event in calendar_events
+        ]
+        return MorningBriefingResult(
+            greeting=f"Good morning, {student_name}!" if student_name else "Good morning!",
+            quote_or_motto=None,
+            top_priorities=[task["title"] for task in tasks if task.get("title")],
+            schedule_overview="; ".join(schedule_items),
+            urgent_alerts=[
+                f"{deadline['title']} (due {deadline['due_at']})"
+                for deadline in deadlines
+                if deadline.get("title") and deadline.get("due_at")
+            ],
+            recommended_recovery_action=None,
         )
-        return validate_structured_output(raw_json, MorningBriefingResult)
 
     async def classify_content(
         self,

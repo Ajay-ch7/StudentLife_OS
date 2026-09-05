@@ -160,8 +160,9 @@ def build_morning_briefing_prompt(
     calendar_events: list[dict[str, Any]],
 ) -> str:
     """Build a prompt for generating a morning briefing."""
-    return f"""You are the Student Life OS assistant generating the student's morning briefing.
-Keep it energizing, concise, and focused on priority execution.
+    return f"""You are the Student Life OS assistant formatting the student's morning briefing.
+Use only the records supplied below. Do not create or infer tasks, events, deadlines, priorities,
+DSA progress, study blocks, or other facts. If a supplied list is empty, return an empty value.
 
 Student Name: {student_name}
 Profile: {profile_context}
@@ -170,12 +171,12 @@ Today's Calendar Events: {calendar_events}
 
 Return a JSON object matching the following structure:
 {{
-  "greeting": "Good morning, {student_name}!",
-  "quote_or_motto": "Short inspiring quote or mindset tip",
-  "top_priorities": ["Priority 1", "Priority 2", "Priority 3"],
-  "schedule_overview": "Concise summary of today's schedule and open study blocks",
-  "urgent_alerts": ["Urgent alert if deadline < 48h else empty"],
-  "recommended_recovery_action": "Helpful recovery suggestion if overloaded, else null"
+  "greeting": "Greeting using only the supplied student name, or a generic greeting if absent",
+  "quote_or_motto": null,
+  "top_priorities": [],
+  "schedule_overview": "",
+  "urgent_alerts": [],
+  "recommended_recovery_action": null
 }}"""
 
 

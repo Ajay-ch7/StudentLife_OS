@@ -19,7 +19,7 @@ class MorningBriefingWorkflow(BaseWorkflow):
 
         # 1. Gather context
         context = await self.agent.get_student_context(user_id, db)
-        student_name = context.get("profile", {}).get("full_name", "Student")
+        student_name = context.get("profile", {}).get("full_name", "")
 
         # 2. Reason via Gemini
         briefing = await self.agent.gemini.generate_morning_briefing(
@@ -27,6 +27,7 @@ class MorningBriefingWorkflow(BaseWorkflow):
             profile=context.get("profile"),
             tasks=context.get("tasks", []),
             calendar_events=context.get("calendar", []),
+            urgent_deadlines=context.get("deadlines", []),
         )
 
         # 3. Format message and trigger notification tool (which requests approval if configured)
