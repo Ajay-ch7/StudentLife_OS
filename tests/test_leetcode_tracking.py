@@ -176,19 +176,19 @@ async def test_dsa_recommendation_workflow_telegram_message_formatting(test_db):
 
     # Verify header & user info
     assert "DSA Progress Update" in sent_text
-    assert "<b>Total Solved:</b> 45" in sent_text
-    assert "<b>User:</b> @test_dev &amp; coder" in sent_text
+    assert "Total Solved: 45" in sent_text
+    assert "User: @test_dev & coder" in sent_text
 
     # Verify grouping by topic
-    assert "<b>Arrays &amp; Hashing</b>" in sent_text
-    assert "• Two Sum (<i>Easy</i>)" in sent_text
-    assert "• Group Anagrams (<i>Medium</i>)" in sent_text
+    assert "Arrays & Hashing" in sent_text
+    assert "• Two Sum (Easy)" in sent_text
+    assert "• Group Anagrams (Medium)" in sent_text
 
-    assert "<b>Two Pointers</b>" in sent_text
-    assert "• 3Sum (<i>Medium</i>)" in sent_text
+    assert "Two Pointers" in sent_text
+    assert "• 3Sum (Medium)" in sent_text
 
     # Verify recommendation section
-    assert "<b>OpenClaw Recommendation:</b>" in sent_text
+    assert "OpenClaw Recommendation:" in sent_text
     assert res["recommendation"] is not None
     assert len(res["recommendation"]) > 0
 

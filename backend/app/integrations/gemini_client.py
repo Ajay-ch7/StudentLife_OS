@@ -262,18 +262,52 @@ class GeminiClient:
             })
 
         if "morning briefing" in prompt_lower:
+            import re
+            # Extract real tasks from prompt if available
+            extracted_priorities = []
+            tasks_match = re.search(r"Upcoming / Due Tasks:\s*(\[.*?\])", prompt, re.DOTALL)
+            if tasks_match:
+                try:
+                    import ast
+                    raw_tasks = ast.literal_eval(tasks_match.group(1))
+                    for t in raw_tasks:
+                        if isinstance(t, dict) and t.get("title") and not any(fake in t["title"].lower() for fake in ["dbms", "database normalization"]):
+                            extracted_priorities.append(t["title"])
+                except Exception:
+                    pass
+
+            name_match = re.search(r"Student Name:\s*([^\n]+)", prompt)
+            st_name = name_match.group(1).strip() if name_match else "Student"
+
+            events_match = re.search(r"Today's Calendar Events:\s*(\[.*?\])", prompt, re.DOTALL)
+            event_titles = []
+            if events_match:
+                try:
+                    import ast
+                    raw_events = ast.literal_eval(events_match.group(1))
+                    for e in raw_events:
+                        if isinstance(e, dict) and e.get("title"):
+                            event_titles.append(e["title"])
+                except Exception:
+                    pass
+
+            schedule_str = (
+                f"Events scheduled today: {', '.join(event_titles)}"
+                if event_titles
+                else "Open schedule today with clear study blocks."
+            )
+
+            priorities = extracted_priorities[:3] if extracted_priorities else [
+                "Review pending tasks and coursework",
+                "Dedicated technical practice session",
+            ]
+
             return json.dumps({
-                "greeting": "Good morning! Here is your daily rhythm.",
-                "quote_or_motto": "Consistent daily execution compounds into remarkable mastery.",
-                "top_priorities": [
-                    "Finish DBMS Assignment questions 1-3",
-                    "Attend 2:00 PM Operating Systems Lecture",
-                    "Solve 1 DSA DP problem"
-                ],
-                "schedule_overview": "Light morning open window followed by 2:00 PM lecture and 5:00 PM study block.",
-                "urgent_alerts": [
-                    "DBMS Assignment due in 4 days"
-                ],
+                "greeting": f"Good morning, {st_name}!",
+                "quote_or_motto": "Focus on consistent progress and what matters most today.",
+                "top_priorities": priorities,
+                "schedule_overview": schedule_str,
+                "urgent_alerts": [],
                 "recommended_recovery_action": None,
             })
 
