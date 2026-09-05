@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -20,6 +21,7 @@ class TelegramAdapter:
         self,
         text: str,
         chat_id: str | None = None,
+        parse_mode: str | None = None,
     ) -> TelegramMessage:
         resolved_chat_id = chat_id or self.settings.telegram_chat_id
 
@@ -40,11 +42,22 @@ class TelegramAdapter:
         endpoint = (
             f"https://api.telegram.org/bot{self.settings.telegram_bot_token}/sendMessage"
         )
+        payload: dict[str, Any] = {"chat_id": resolved_chat_id, "text": text}
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+
         async with httpx.AsyncClient(timeout=self.settings.gemini_timeout_seconds) as client:
             response = await client.post(
                 endpoint,
-                data={"chat_id": resolved_chat_id, "text": text},
+                json=payload,
             )
+            # Fallback if telegram fails to parse custom entities/HTML
+            if response.status_code == 400 and parse_mode and "can't parse entities" in response.text:
+                payload.pop("parse_mode", None)
+                response = await client.post(
+                    endpoint,
+                    json=payload,
+                )
             response.raise_for_status()
 
         return TelegramMessage(
