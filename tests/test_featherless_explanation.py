@@ -91,7 +91,9 @@ async def test_featherless_service_explain_decision(mock_featherless_response):
     mock_resp.status_code = 200
     mock_resp.json.return_value = mock_featherless_response
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+    settings = get_settings()
+    with patch.object(settings, "featherless_api_key", "test-key"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_resp
 
         result = await service.explain_decision(ctx, user_query="Why did you do that?")
@@ -207,7 +209,9 @@ def test_api_explain_endpoint(db_session, mock_featherless_response):
     mock_resp.status_code = 200
     mock_resp.json.return_value = mock_featherless_response
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+    settings = get_settings()
+    with patch.object(settings, "featherless_api_key", "test-key"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_resp
 
         # Override user auth dependency
