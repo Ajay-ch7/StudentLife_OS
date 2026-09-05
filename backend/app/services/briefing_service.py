@@ -127,19 +127,30 @@ class BriefingService:
             urgent_deadlines=context["urgent_deadlines"],
         )
 
-        # 2. Format plain text for notification
+        # 2. Format plain text for notification (clean, human-readable, no emojis)
+        alert_section = ("\n\nUpcoming Cutoffs:\n" + "\n".join(f"• {a}" for a in briefing.urgent_alerts)) if briefing.urgent_alerts else ""
+        recovery_section = f"\n\nPro-tip: {briefing.recommended_recovery_action}" if briefing.recommended_recovery_action else ""
+        priorities_section = "\n".join(f"• {p}" for p in briefing.top_priorities) if briefing.top_priorities else "• Review active goals and coursework"
+
         formatted_message = (
+<<<<<<< HEAD
             f"🌅 {briefing.greeting}\n\n"
             + (f"💡 Mindset: \"{briefing.quote_or_motto}\"\n\n" if briefing.quote_or_motto else "")
             + f"🎯 Top Priorities Today:\n"
             + ("\n".join(f"• {p}" for p in briefing.top_priorities) or "")
             + "\n\n"
             + f"📅 Today's Timeline:\n{briefing.schedule_overview}"
+=======
+            f"{briefing.greeting}\n\n"
+            f"Mindset: \"{briefing.quote_or_motto or 'Focus on what matters.'}\"\n\n"
+            f"Top Priorities Today:\n"
+            f"{priorities_section}\n\n"
+            f"Today's Timeline:\n"
+            f"{briefing.schedule_overview}"
+            f"{alert_section}"
+            f"{recovery_section}"
+>>>>>>> 3bbb5bababa7202e08d080ffcbd5dd12cf5dca3a
         )
-        if briefing.urgent_alerts:
-            formatted_message += "\n\n⚠️ Upcoming Cutoffs:\n" + "\n".join(f"• {a}" for a in briefing.urgent_alerts)
-        if briefing.recommended_recovery_action:
-            formatted_message += f"\n\n🛠️ Pro-tip: {briefing.recommended_recovery_action}"
 
         delivery_status = "not_requested"
         mocked_delivery = True

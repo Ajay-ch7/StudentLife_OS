@@ -77,6 +77,47 @@ class GeminiService:
         )
         return validate_structured_output(raw_json, OpportunitySkillAnalysis)
 
+    def _build_grounded_briefing_fallback(
+        self,
+        student_name: str,
+        tasks: list[dict[str, Any]],
+        calendar_events: list[dict[str, Any]],
+    ) -> MorningBriefingResult:
+        """Construct a 100% grounded morning briefing directly from database context without external APIs."""
+        priorities = [
+            t.get("title")
+            for t in tasks
+            if t.get("title") and not any(fake in t.get("title", "").lower() for fake in ["dbms", "database normalization", "operating systems lecture"])
+        ][:3]
+        if not priorities:
+            priorities = ["Review active goals and coursework", "Dedicated problem-solving practice session"]
+
+        if calendar_events:
+            ev_desc = ", ".join(f"{e.get('title')}" for e in calendar_events[:3] if e.get("title"))
+            schedule_str = f"Events today: {ev_desc}."
+        else:
+            schedule_str = "Your schedule is clear today with open windows for focused work."
+
+        urgent_alerts = []
+        for t in tasks:
+            if t.get("priority") in ("urgent", "high") and t.get("title") and not any(fake in t.get("title", "").lower() for fake in ["dbms", "database normalization"]):
+                dl = t.get("deadline")
+                if dl:
+                    urgent_alerts.append(f"{t['title']} (Due: {dl[:10]})")
+                else:
+                    urgent_alerts.append(f"{t['title']}")
+                if len(urgent_alerts) >= 2:
+                    break
+
+        return MorningBriefingResult(
+            greeting=f"Good morning, {student_name or 'Student'}!",
+            quote_or_motto="Focus on consistent progress and what matters most today.",
+            top_priorities=priorities,
+            schedule_overview=schedule_str,
+            urgent_alerts=urgent_alerts,
+            recommended_recovery_action=None,
+        )
+
     async def generate_morning_briefing(
         self,
         student_name: str,
@@ -85,6 +126,7 @@ class GeminiService:
         calendar_events: list[dict[str, Any]],
         urgent_deadlines: list[dict[str, Any]] | None = None,
     ) -> MorningBriefingResult:
+<<<<<<< HEAD
         """Build a briefing strictly from records already present in the workspace."""
         deadlines = urgent_deadlines or []
         schedule_items = [
@@ -103,6 +145,39 @@ class GeminiService:
             ],
             recommended_recovery_action=None,
         )
+=======
+        """Generate a focused morning briefing summary for the day."""
+        profile_context = build_minimal_profile_context(profile)
+        prompt = build_morning_briefing_prompt(student_name, profile_context, tasks, calendar_events)
+        try:
+            raw_json = await self.client.generate_json(
+                prompt=prompt,
+                system_instruction="You are the Student Life OS assistant. Return only concise, high-impact morning briefings in valid JSON grounded strictly in provided tasks and events. Never invent fake tasks.",
+            )
+            res = validate_structured_output(raw_json, MorningBriefingResult)
+            # Filter out any hallucinated DBMS tasks
+            filtered_priorities = [
+                p for p in res.top_priorities
+                if not any(fake in p.lower() for fake in ["dbms assignment", "database normalization", "operating systems lecture"])
+            ]
+            if not filtered_priorities and tasks:
+                filtered_priorities = [
+                    t.get("title", "Task") for t in tasks
+                    if not any(fake in t.get("title", "").lower() for fake in ["dbms", "database normalization"])
+                ][:3]
+            res.top_priorities = filtered_priorities or ["Review active goals and coursework"]
+
+            # Filter hallucinated urgent alerts
+            filtered_alerts = [
+                a for a in res.urgent_alerts
+                if not any(fake in a.lower() for fake in ["dbms", "database normalization"])
+            ]
+            res.urgent_alerts = filtered_alerts
+            return res
+        except Exception as err:
+            logger.warning("Morning briefing generation fallback to grounded database context: %s", err)
+            return self._build_grounded_briefing_fallback(student_name, tasks, calendar_events)
+>>>>>>> 3bbb5bababa7202e08d080ffcbd5dd12cf5dca3a
 
     async def classify_content(
         self,

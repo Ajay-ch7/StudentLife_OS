@@ -105,38 +105,83 @@ class DSARecommendationWorkflow(BaseWorkflow):
                 next_topic = weak_topics[0] if weak_topics else "Arrays & Hashing"
                 recommendation_text = f"Maintain your daily momentum with a Medium problem in {next_topic}."
 
-        # Build clean, structured Telegram HTML notification
-        user_header = f"👤 <b>User:</b> @{html.escape(user_display)}\n" if user_display else ""
+        # Build clean, human-readable notification (no HTML tags, no emojis)
+        clean_user = user_display.lstrip("@") if user_display else ""
+        user_header = f"User: @{clean_user}\n" if clean_user else ""
 
         if newly_solved:
+            easy_c = sum(1 for p in newly_solved if (p.get("difficulty") or "").strip().lower() == "easy")
+            med_c = sum(1 for p in newly_solved if (p.get("difficulty") or "").strip().lower() in ("medium", "med"))
+            hard_c = sum(1 for p in newly_solved if (p.get("difficulty") or "").strip().lower() == "hard")
+
+            breakdown_parts = []
+            if easy_c:
+                breakdown_parts.append(f"{easy_c} Easy")
+            if med_c:
+                breakdown_parts.append(f"{med_c} Medium")
+            if hard_c:
+                breakdown_parts.append(f"{hard_c} Hard")
+            breakdown_str = f" ({', '.join(breakdown_parts)})" if breakdown_parts else ""
+
+            total_new = len(newly_solved)
+            problem_word = "problem" if total_new == 1 else "problems"
+
             grouped_blocks = []
             for topic, probs in grouped_problems.items():
                 prob_lines = [
-                    f"  • {html.escape(p.get('title', 'Problem'))} (<i>{html.escape(p.get('difficulty', 'Medium'))}</i>)"
+                    f"  • {p.get('title', 'Problem')} ({p.get('difficulty', 'Medium')})"
                     for p in probs
                 ]
-                grouped_blocks.append(f"<b>{html.escape(topic)}</b>\n" + "\n".join(prob_lines))
+                grouped_blocks.append(f"{topic} ({len(probs)}):\n" + "\n".join(prob_lines))
 
             newly_solved_section = "\n\n".join(grouped_blocks)
 
             telegram_msg = (
-                "📈 <b>DSA Progress Update</b>\n\n"
+                "DSA Progress Update\n"
+                "----------------------------------------\n"
                 f"{user_header}"
-                f"🔥 <b>Streak:</b> {streak} days\n"
-                f"📊 <b>Total Solved:</b> {total}\n\n"
-                f"<b>Newly Solved</b>\n\n"
+                f"Streak: {streak} days | Total Solved: {total}\n"
+                f"Newly Solved: {total_new} {problem_word}{breakdown_str}\n"
+                "----------------------------------------\n\n"
                 f"{newly_solved_section}\n\n"
-                f"💡 <b>OpenClaw Recommendation:</b>\n"
-                f"{html.escape(recommendation_text)}"
+                "----------------------------------------\n"
+                "OpenClaw Recommendation:\n"
+                f"{recommendation_text}"
             )
+
+            # Safeguard against Telegram 4096 character limit
+            if len(telegram_msg) > 4000:
+                trimmed_blocks = []
+                curr_len = len(telegram_msg) - len(newly_solved_section)
+                for block in grouped_blocks:
+                    if curr_len + len(block) < 3700:
+                        trimmed_blocks.append(block)
+                        curr_len += len(block)
+                    else:
+                        trimmed_blocks.append("... and additional problems recorded")
+                        break
+                newly_solved_section = "\n\n".join(trimmed_blocks)
+                telegram_msg = (
+                    "DSA Progress Update\n"
+                    "----------------------------------------\n"
+                    f"{user_header}"
+                    f"Streak: {streak} days | Total Solved: {total}\n"
+                    f"Newly Solved: {total_new} {problem_word}{breakdown_str}\n"
+                    "----------------------------------------\n\n"
+                    f"{newly_solved_section}\n\n"
+                    "----------------------------------------\n"
+                    "OpenClaw Recommendation:\n"
+                    f"{recommendation_text}"
+                )
         else:
             telegram_msg = (
-                "📈 <b>DSA Progress Summary</b>\n\n"
+                "DSA Progress Summary\n"
+                "----------------------------------------\n"
                 f"{user_header}"
-                f"🔥 <b>Streak:</b> {streak} days\n"
-                f"📊 <b>Total Solved:</b> {total}\n\n"
-                f"💡 <b>OpenClaw Recommendation:</b>\n"
-                f"{html.escape(recommendation_text)}"
+                f"Streak: {streak} days | Total Solved: {total}\n"
+                "----------------------------------------\n\n"
+                "OpenClaw Recommendation:\n"
+                f"{recommendation_text}"
             )
 
         # Dispatch Telegram message if chat ID is configured
